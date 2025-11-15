@@ -205,7 +205,6 @@ _G.ESPPlayers = function(enabled)
         end)
         
         ESP.Enabled = true
-        print("Survivors ESP activated for " .. #survivors .. " survivors")
         return true
         
     else
@@ -236,7 +235,6 @@ _G.ESPPlayers = function(enabled)
         end
         
         ESP.CurrentSurvivors = {}
-        print("Survivors ESP deactivated")
         return true
     end
 end
