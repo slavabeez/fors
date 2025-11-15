@@ -3,191 +3,166 @@ local AnimationDetector = {}
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
 
 function AnimationDetector.Start(callback, radius)
     local localPlayer = Players.LocalPlayer
-    local character = localPlayer.Character
     local stopTracking = false
     
-    -- Настройки
-    local TRACKING_RADIUS = radius or 5
-    local CHECK_INTERVAL = 0.05
-    
-    -- Таблица для отслеживания анимаций
-    local trackedAnimations = {}
-    
-    -- Функция для проверки расстояния
-    local function isInRange(position, targetRadius)
-        if not character or not character.PrimaryPart then
-            return false
-        end
-        local distance = (character.PrimaryPart.Position - position).Magnitude
-        return distance <= targetRadius
+    -- Функция для копирования в буфер обмена
+    local function copyToClipboard(text)
+        pcall(function()
+            setclipboard(tostring(text))
+        end)
     end
     
-    -- Функция для поиска анимаций через загрузку анимаций (как в вашем коде)
-    local function findAttackAnimations()
-        local attackAnimations = {}
-        
-        for _, player in ipairs(Players:GetPlayers()) do
-            -- Пропускаем локального игрока
-            if player ~= localPlayer then
-                local otherCharacter = player.Character
-                
-                if otherCharacter and otherCharacter.PrimaryPart then
-                    -- Получаем актора игрока (как в вашем коде)
-                    local actorsModule = require(game.ReplicatedStorage.Modules.Actors)
-                    local actor = actorsModule.CurrentActors[player]
+    local function trackAnimations()
+        local connection
+        connection = RunService.Heartbeat:Connect(function()
+            if stopTracking then return end
+            
+            local character = localPlayer.Character
+            if not character or not character.PrimaryPart then return end
+            
+            local actorsModule = require(game.ReplicatedStorage.Modules.Actors)
+            local detectedAnimations = {}
+            
+            for player, actor in pairs(actorsModule.CurrentActors) do
+                if player ~= localPlayer and actor and actor.Rig then
+                    local otherCharacter = actor.Rig
+                    local distance = (character.PrimaryPart.Position - otherCharacter.PrimaryPart.Position).Magnitude
                     
-                    if actor and actor.Rig then
-                        -- Проверяем кэш анимаций актора (как в Execution части)
-                        for animName, animTrack in pairs(actor.Cache or {}) do
-                            if typeof(animTrack) == "userdata" and animTrack.IsPlaying then
-                                -- Ищем анимации атаки по названию
-                                if animName:lower():find("attack") or 
-                                   animName:lower():find("swing") or 
-                                   animName:lower():find("execution") or
-                                   animName:lower():find("kill") or
-                                   animName:lower():find("hit") then
-                                    
-                                    table.insert(attackAnimations, {
-                                        Player = player,
-                                        Character = otherCharacter,
-                                        Animation = animTrack,
-                                        Position = otherCharacter.PrimaryPart.Position,
-                                        AnimationName = animName,
-                                        Actor = actor,
-                                        Timestamp = tick()
-                                    })
-                                end
-                            end
-                        end
-                        
+                    if distance <= radius then
                         -- Проверяем текущие проигрываемые анимации через Animator
-                        local humanoid = actor.Rig:FindFirstChildOfClass("Humanoid")
+                        local humanoid = otherCharacter:FindFirstChildOfClass("Humanoid")
                         if humanoid then
                             local animator = humanoid:FindFirstChildOfClass("Animator")
                             if animator then
                                 for _, animTrack in ipairs(animator:GetPlayingAnimationTracks()) do
-                                    if animTrack.IsPlaying and (
-                                        animTrack.Name:lower():find("attack") or
-                                        animTrack.Name:lower():find("swing") or
-                                        animTrack.Name:lower():find("hit") or
-                                        animTrack.Name:lower():find("melee")
-                                    ) then
-                                        table.insert(attackAnimations, {
-                                            Player = player,
-                                            Character = otherCharacter,
-                                            Animation = animTrack,
-                                            Position = otherCharacter.PrimaryPart.Position,
-                                            AnimationName = animTrack.Name,
-                                            Actor = actor,
-                                            Timestamp = tick()
-                                        })
+                                    if animTrack.IsPlaying then
+                                        -- Проверяем анимации атаки по названию
+                                        local animName = animTrack.Name:lower()
+                                        if animName:find("attack") or 
+                                           animName:find("slash") or 
+                                           animName:find("punch") or
+                                           animName:find("hit") or
+                                           animName:find("execution") or
+                                           animName:find("charge") or
+                                           animName:find("demonic") or
+                                           animName:find("blood") then
+                                            
+                                            -- Собираем информацию для отладки
+                                            local animInfo = string.format("🎯 АНИМАЦИЯ: %s | Игрок: %s | Дистанция: %.1f", 
+                                                animTrack.Name, player.Name, distance)
+                                            table.insert(detectedAnimations, animInfo)
+                                            
+                                            -- Вызываем callback
+                                            pcall(callback, animTrack, player, otherCharacter, animTrack.Name)
+                                        end
                                     end
                                 end
                             end
                         end
+                        
+                        -- Дополнительно проверяем Config.Animations на наличие анимаций атаки
+                        if actor.Config and actor.Config.Animations then
+                            for animName, animData in pairs(actor.Config.Animations) do
+                                local lowerName = animName:lower()
+                                if lowerName:find("attack") or 
+                                   lowerName:find("slash") or 
+                                   lowerName:find("punch") or
+                                   lowerName:find("execution") or
+                                   lowerName:find("demonic") or
+                                   lowerName:find("blood") then
+                                    
+                                    local animInfo = string.format("⚡ CONFIG АНИМАЦИЯ: %s | Игрок: %s | Дистанция: %.1f", 
+                                        animName, player.Name, distance)
+                                    table.insert(detectedAnimations, animInfo)
+                                end
+                            end
+                        end
                     end
-                    
-                    -- Проверяем Execution анимации через атрибуты (как в вашем коде)
-                    if otherCharacter:GetAttribute("Executing") then
-                        table.insert(attackAnimations, {
-                            Player = player,
-                            Character = otherCharacter,
-                            Animation = nil,
-                            Position = otherCharacter.PrimaryPart.Position,
-                            AnimationName = "Execution",
-                            Actor = nil,
-                            Timestamp = tick(),
-                            IsExecution = true
-                        })
-                    end
-                end
-            end
-        end
-        
-        return attackAnimations
-    end
-    
-    -- Основная функция отслеживания
-    local function trackAnimations()
-        local connection
-        connection = RunService.Heartbeat:Connect(function()
-            if stopTracking then
-                connection:Disconnect()
-                return
-            end
-            
-            -- Обновляем ссылку на персонажа
-            character = localPlayer.Character
-            if not character or not character.PrimaryPart then
-                return
-            end
-            
-            -- Ищем анимации атаки
-            local attackAnims = findAttackAnimations()
-            
-            for _, animData in ipairs(attackAnims) do
-                local animId = animData.Player.Name .. "_" .. animData.AnimationName .. "_" .. tostring(math.floor(animData.Timestamp))
-                
-                -- Если анимация в радиусе и мы ее еще не отслеживали
-                if isInRange(animData.Position, TRACKING_RADIUS) and not trackedAnimations[animId] then
-                    -- Вызываем callback с информацией об анимации
-                    pcall(callback, animData.Animation, animData.Player, animData.Character, animData.AnimationName)
-                    
-                    -- Помечаем как отслеженную
-                    trackedAnimations[animId] = true
-                    
-                    -- Логирование для отладки
-                    print("🎯 Обнаружена анимация атаки:", animData.AnimationName)
-                    print("👤 Игрок:", animData.Player.Name)
-                    print("📍 Расстояние:", (character.PrimaryPart.Position - animData.Position).Magnitude)
-                    
-                    -- Автоматическая очистка через 1 секунду
-                    task.delay(1, function()
-                        trackedAnimations[animId] = nil
-                    end)
                 end
             end
             
-            -- Очистка старых записей (старше 3 секунд)
-            local currentTime = tick()
-            for animId, timestamp in pairs(trackedAnimations) do
-                if currentTime - timestamp > 3 then
-                    trackedAnimations[animId] = nil
-                end
+            -- Если найдены анимации, копируем информацию в буфер обмена
+            if #detectedAnimations > 0 then
+                local debugText = "ОБНАРУЖЕНЫ АНИМАЦИИ АТАКИ:\n" .. table.concat(detectedAnimations, "\n")
+                copyToClipboard(debugText)
+                print(debugText)
             end
         end)
-        
         return connection
     end
     
-    -- Обработчик изменения персонажа
-    local characterConnection
-    characterConnection = localPlayer.CharacterAdded:Connect(function(newCharacter)
-        character = newCharacter
-        print("🔁 Персонаж изменен, возобновление отслеживания...")
-    end)
-    
-    -- Запускаем отслеживание
     local heartbeatConnection = trackAnimations()
     
-    -- Функция для остановки
     local function stopFunction()
         stopTracking = true
         if heartbeatConnection then
             heartbeatConnection:Disconnect()
         end
-        if characterConnection then
-            characterConnection:Disconnect()
-        end
-        trackedAnimations = {}
-        print("🛑 Отслеживание анимаций остановлено")
     end
     
-    print("🎯 Отслеживание анимаций атаки запущено! Радиус: " .. TRACKING_RADIUS .. " studs")
+    print("🎯 Отслеживание анимаций запущено! Радиус: " .. radius .. " studs")
+    return stopFunction
+end
+
+-- Упрощенная версия для тестирования
+function AnimationDetector.StartSimple(callback, radius)
+    local localPlayer = Players.LocalPlayer
+    local stopTracking = false
+    
+    local function trackAllAnimations()
+        local connection
+        connection = RunService.Heartbeat:Connect(function()
+            if stopTracking then return end
+            
+            local character = localPlayer.Character
+            if not character or not character.PrimaryPart then return end
+            
+            local actorsModule = require(game.ReplicatedStorage.Modules.Actors)
+            
+            for player, actor in pairs(actorsModule.CurrentActors) do
+                if player ~= localPlayer and actor and actor.Rig then
+                    local otherCharacter = actor.Rig
+                    local distance = (character.PrimaryPart.Position - otherCharacter.PrimaryPart.Position).Magnitude
+                    
+                    if distance <= radius then
+                        -- Логируем ВСЕ анимации для отладки
+                        local humanoid = otherCharacter:FindFirstChildOfClass("Humanoid")
+                        if humanoid then
+                            local animator = humanoid:FindFirstChildOfClass("Animator")
+                            if animator then
+                                for _, animTrack in ipairs(animator:GetPlayingAnimationTracks()) do
+                                    if animTrack.IsPlaying then
+                                        -- Вызываем callback для ЛЮБОЙ анимации
+                                        pcall(callback, animTrack, player, otherCharacter, animTrack.Name)
+                                        
+                                        -- Автоматически копируем информацию
+                                        local debugText = string.format("АНИМАЦИЯ: %s | Игрок: %s | Дистанция: %.1f", 
+                                            animTrack.Name, player.Name, distance)
+                                        pcall(function() setclipboard(debugText) end)
+                                        print("📋 Скопировано в буфер:", debugText)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        return connection
+    end
+    
+    local heartbeatConnection = trackAllAnimations()
+    
+    local function stopFunction()
+        stopTracking = true
+        if heartbeatConnection then
+            heartbeatConnection:Disconnect()
+        end
+    end
+    
     return stopFunction
 end
 
