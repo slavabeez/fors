@@ -1,5 +1,3 @@
--- Вставь этот код по ссылке: https://raw.githubusercontent.com/slavabeez/fors/refs/heads/main/ESPKiller.lua
-
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
@@ -82,21 +80,21 @@ _G.ESPKiller = function(enabled)
         billboard.MaxDistance = 2000
         billboard.Parent = rootPart
         
-        -- Фон
+        -- Фон - СДЕЛАЛИ ПРОЗРАЧНЫМ
         local background = Instance.new("Frame")
         background.Size = UDim2.new(1, 0, 1, 0)
         background.BackgroundColor3 = Color3.new(0, 0, 0)
-        background.BackgroundTransparency = 0.6
+        background.BackgroundTransparency = 1.0 -- ПОЛНОСТЬЮ ПРОЗРАЧНЫЙ
         background.BorderSizePixel = 0
         background.Parent = billboard
         
         -- Имя убийцы
         local nameLabel = Instance.new("TextLabel")
         nameLabel.Size = UDim2.new(1, 0, 0.6, 0)
-        nameLabel.BackgroundTransparency = 1
+        nameLabel.BackgroundTransparency = 1 -- Прозрачный фон
         nameLabel.Text = killer.Name
         nameLabel.TextColor3 = Color3.new(1, 0, 0)
-        nameLabel.TextStrokeTransparency = 0
+        nameLabel.TextStrokeTransparency = 0.2 -- Полупрозрачная обводка
         nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
         nameLabel.TextSize = 16
         nameLabel.Font = Enum.Font.GothamBold
@@ -106,10 +104,10 @@ _G.ESPKiller = function(enabled)
         local distanceLabel = Instance.new("TextLabel")
         distanceLabel.Size = UDim2.new(1, 0, 0.4, 0)
         distanceLabel.Position = UDim2.new(0, 0, 0.6, 0)
-        distanceLabel.BackgroundTransparency = 1
+        distanceLabel.BackgroundTransparency = 1 -- Прозрачный фон
         distanceLabel.Text = "0m"
         distanceLabel.TextColor3 = Color3.new(1, 1, 1)
-        distanceLabel.TextStrokeTransparency = 0
+        distanceLabel.TextStrokeTransparency = 0.2 -- Полупрозрачная обводка
         distanceLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
         distanceLabel.TextSize = 12
         distanceLabel.Font = Enum.Font.Gotham
