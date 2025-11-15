@@ -9,13 +9,18 @@ local isDetectionActive = false
 local currentRadiusValue = 10
 
 local function StartHitboxDetection(callbackFunction, radiusValue)
+    if not callbackFunction then
+        warn("Callback function is nil!")
+        return function() end
+    end
+    
     if currentDetectionConnection then
         currentDetectionConnection()
         currentDetectionConnection = nil
     end
     
     isDetectionActive = true
-    currentRadiusValue = radiusValue or 10 -- Защита от nil
+    currentRadiusValue = radiusValue or 10
 
     local function setupDetection()
         if not isDetectionActive then return end
@@ -23,15 +28,16 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
         local character = localPlayer.Character
         if not character then return end
         
-        local humanoid = character:WaitForChild("Humanoid")
-        local rootPart = character:WaitForChild("HumanoidRootPart")
-        if not rootPart then return end
+        local humanoid = character:FindFirstChild("Humanoid")
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if not humanoid or not rootPart then return end
         
         local activeHitboxes = {}
-        local DETECTION_RADIUS = currentRadiusValue or 10 -- Защита от nil
+        local DETECTION_RADIUS = currentRadiusValue or 10
 
         local function isKillerHitbox(hitbox)
             if not hitbox then return false end
+            if not hitbox.Name then return false end
             
             if hitbox.Name:find(localPlayer.Name) then
                 return false
@@ -63,6 +69,8 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
                 end
             end
             
+            if not hitbox:IsA("BasePart") then return false end
+            
             local originalCanTouch = hitbox.CanTouch
             hitbox.CanTouch = true
             
@@ -89,14 +97,21 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
             
             for _, hitbox in ipairs(hitboxesFolder:GetChildren()) do
                 if hitbox:IsA("BasePart") and not hitbox:GetAttribute("Hidden") then
+                    if not hitbox.Position then continue end
+                    
                     local distance = (hitbox.Position - characterPos).Magnitude
                     
-                    -- 🔧 ИСПРАВЛЕННАЯ СТРОКА С ПРОВЕРКОЙ НА NIL 🔧
                     if distance and DETECTION_RADIUS and distance <= DETECTION_RADIUS and isKillerHitbox(hitbox) then
                         if checkHitboxTouch(hitbox, character) then
                             if not activeHitboxes[hitbox] then
                                 activeHitboxes[hitbox] = true
-                                callbackFunction(hitbox, localPlayer, character)
+                                
+                                -- 🔧 ЗАЩИЩЕННЫЙ ВЫЗОВ CALLBACK 🔧
+                                if type(callbackFunction) == "function" then
+                                    pcall(function()
+                                        callbackFunction(hitbox, localPlayer, character)
+                                    end)
+                                end
                             end
                         else
                             activeHitboxes[hitbox] = nil
@@ -108,8 +123,9 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
             end
         end
 
-        local detectionConnection = RunService.Heartbeat:Connect(function()
-            checkForHitboxes()
+        local detectionConnection
+        detectionConnection = RunService.Heartbeat:Connect(function()
+            pcall(checkForHitboxes)
         end)
 
         humanoid.Died:Connect(function()
@@ -119,7 +135,7 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
             table.clear(activeHitboxes)
             if isDetectionActive then
                 task.wait(3)
-                setupDetection()
+                pcall(setupDetection)
             end
         end)
 
@@ -134,19 +150,19 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
     local function initializeDetection()
         local stopFunction
         
-        localPlayer.CharacterAdded:Connect(function()
+        localPlayer.CharacterAdded:Connect(function(character)
             if stopFunction then
                 stopFunction()
             end
             if isDetectionActive then
                 task.wait(1)
-                stopFunction = setupDetection()
+                stopFunction = pcall(setupDetection) or nil
             end
         end)
 
         if localPlayer.Character then
             task.wait(1)
-            stopFunction = setupDetection()
+            stopFunction = pcall(setupDetection) or nil
         end
         
         return stopFunction
@@ -157,7 +173,7 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
     return function()
         isDetectionActive = false
         if currentDetectionConnection then
-            currentDetectionConnection()
+            pcall(currentDetectionConnection)
             currentDetectionConnection = nil
         end
     end
