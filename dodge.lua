@@ -15,7 +15,7 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
     end
     
     isDetectionActive = true
-    currentRadiusValue = radiusValue
+    currentRadiusValue = radiusValue or 10 -- Защита от nil
 
     local function setupDetection()
         if not isDetectionActive then return end
@@ -25,10 +25,14 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
         
         local humanoid = character:WaitForChild("Humanoid")
         local rootPart = character:WaitForChild("HumanoidRootPart")
+        if not rootPart then return end
+        
         local activeHitboxes = {}
-        local DETECTION_RADIUS = currentRadiusValue
+        local DETECTION_RADIUS = currentRadiusValue or 10 -- Защита от nil
 
         local function isKillerHitbox(hitbox)
+            if not hitbox then return false end
+            
             if hitbox.Name:find(localPlayer.Name) then
                 return false
             end
@@ -45,11 +49,13 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
         end
 
         local function checkHitboxTouch(hitbox, character)
+            if not hitbox or not character then return false end
+            
             local touched = false
             local touchConnection
             
             local function onTouched(otherPart)
-                if otherPart.Parent == character then
+                if otherPart and otherPart.Parent == character then
                     touched = true
                     if touchConnection then
                         touchConnection:Disconnect()
@@ -85,7 +91,8 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
                 if hitbox:IsA("BasePart") and not hitbox:GetAttribute("Hidden") then
                     local distance = (hitbox.Position - characterPos).Magnitude
                     
-                    if distance <= DETECTION_RADIUS and isKillerHitbox(hitbox) then
+                    -- 🔧 ИСПРАВЛЕННАЯ СТРОКА С ПРОВЕРКОЙ НА NIL 🔧
+                    if distance and DETECTION_RADIUS and distance <= DETECTION_RADIUS and isKillerHitbox(hitbox) then
                         if checkHitboxTouch(hitbox, character) then
                             if not activeHitboxes[hitbox] then
                                 activeHitboxes[hitbox] = true
