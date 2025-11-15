@@ -206,13 +206,15 @@ function KillerESP:Initialize()
         self:UpdateDistance()
     end)
     
-    -- Отслеживаем удаление убийцы
-    self.Connections.killerRemoved = self.CurrentKiller.AncestryChanged:Connect(function()
-        if not self.CurrentKiller or not self.CurrentKiller.Parent then
-            print("Killer was removed, will auto-find new one...")
-            self:ScheduleReinitialize()
-        end
-    end)
+    -- ОТСЛЕЖИВАНИЕ УДАЛЕНИЯ УБИЙЦЫ - ИСПРАВЛЕННАЯ ЧАСТЬ
+    if self.CurrentKiller then
+        self.Connections.killerRemoved = self.CurrentKiller.AncestryChanged:Connect(function(_, parent)
+            if parent == nil then
+                print("Killer was removed, will auto-find new one...")
+                self:ScheduleReinitialize()
+            end
+        end)
+    end
     
     self.Enabled = true
     print("ESP successfully activated for: " .. self.CurrentKiller.Name)
@@ -223,11 +225,15 @@ function KillerESP:ScheduleReinitialize()
     -- Планируем переинициализацию через 1 секунду
     if self.Connections.reinitialize then
         self.Connections.reinitialize:Disconnect()
+        self.Connections.reinitialize = nil
     end
     
     self.Connections.reinitialize = RunService.Heartbeat:Connect(function()
         wait(1) -- Ждем 1 секунду
-        self.Connections.reinitialize:Disconnect()
+        if self.Connections.reinitialize then
+            self.Connections.reinitialize:Disconnect()
+            self.Connections.reinitialize = nil
+        end
         
         if self.LastCommand then -- Переинициализируем только если ESP было включено
             print("Auto-reinitializing ESP...")
@@ -243,20 +249,20 @@ function KillerESP:Cleanup()
     for name, connection in pairs(self.Connections) do
         if connection then
             connection:Disconnect()
+            self.Connections[name] = nil
         end
     end
-    self.Connections = {}
     
     -- Удаляем все подсветки
     for _, highlight in pairs(self.Highlights) do
-        if highlight then
+        if highlight and highlight.Parent then
             highlight:Destroy()
         end
     end
     self.Highlights = {}
     
     -- Удаляем тег с именем
-    if self.NameTag and self.NameTag.billboard then
+    if self.NameTag and self.NameTag.billboard and self.NameTag.billboard.Parent then
         self.NameTag.billboard:Destroy()
         self.NameTag = nil
     end
