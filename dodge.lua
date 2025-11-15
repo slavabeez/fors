@@ -1,61 +1,51 @@
+print("V2")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local localPlayer = Players.LocalPlayer
-
-local currentDetectionConnection
-local isDetectionActive = false
-local currentRadiusValue = 10
+local currentStopFunction = nil
 
 local function StartHitboxDetection(callbackFunction, radiusValue)
-    if not callbackFunction then
-        warn("Callback function is nil!")
+    if currentStopFunction then
+        currentStopFunction()
+        currentStopFunction = nil
+    end
+    
+    if not callbackFunction or type(callbackFunction) ~= "function" then
+        warn("Invalid callback function")
         return function() end
     end
     
-    if currentDetectionConnection then
-        currentDetectionConnection()
-        currentDetectionConnection = nil
+    local isActive = true
+    local detectionRadius = radiusValue or 10
+    
+    local function safeCallback(...)
+        if isActive and callbackFunction then
+            pcall(callbackFunction, ...)
+        end
     end
     
-    isDetectionActive = true
-    currentRadiusValue = radiusValue or 10
-
     local function setupDetection()
-        if not isDetectionActive then return end
+        if not isActive then return end
         
         local character = localPlayer.Character
         if not character then return end
         
         local humanoid = character:FindFirstChild("Humanoid")
         local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if not humanoid or not rootPart then return end
+        if not humanoid or not rootPart or humanoid.Health <= 0 then return end
         
         local activeHitboxes = {}
-        local DETECTION_RADIUS = currentRadiusValue or 10
-
+        
         local function isKillerHitbox(hitbox)
             if not hitbox then return false end
-            if not hitbox.Name then return false end
-            
-            if hitbox.Name:find(localPlayer.Name) then
-                return false
-            end
-            
-            if hitbox:GetAttribute("Damage") and hitbox:GetAttribute("Damage") > 0 then
-                return true
-            end
-            
-            if hitbox.Name:find("Killer") or hitbox.Name:find("Damage") then
-                return true
-            end
-            
+            if hitbox.Name:find(localPlayer.Name) then return false end
             return true
         end
-
-        local function checkHitboxTouch(hitbox, character)
-            if not hitbox or not character then return false end
+        
+        local function checkHitboxTouch(hitbox)
+            if not hitbox then return false end
             
             local touched = false
             local touchConnection
@@ -63,17 +53,11 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
             local function onTouched(otherPart)
                 if otherPart and otherPart.Parent == character then
                     touched = true
-                    if touchConnection then
-                        touchConnection:Disconnect()
-                    end
                 end
             end
             
-            if not hitbox:IsA("BasePart") then return false end
-            
             local originalCanTouch = hitbox.CanTouch
             hitbox.CanTouch = true
-            
             touchConnection = hitbox.Touched:Connect(onTouched)
             
             RunService.Heartbeat:Wait()
@@ -85,33 +69,24 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
             
             return touched
         end
-
+        
         local function checkForHitboxes()
-            if not isDetectionActive or not character or not rootPart or humanoid.Health <= 0 then
-                return
-            end
+            if not isActive or not character or not rootPart then return end
             
-            local characterPos = rootPart.Position
             local hitboxesFolder = Workspace:FindFirstChild("Hitboxes")
             if not hitboxesFolder then return end
             
             for _, hitbox in ipairs(hitboxesFolder:GetChildren()) do
+                if not isActive then break end
+                
                 if hitbox:IsA("BasePart") and not hitbox:GetAttribute("Hidden") then
-                    if not hitbox.Position then continue end
+                    local distance = (hitbox.Position - rootPart.Position).Magnitude
                     
-                    local distance = (hitbox.Position - characterPos).Magnitude
-                    
-                    if distance and DETECTION_RADIUS and distance <= DETECTION_RADIUS and isKillerHitbox(hitbox) then
-                        if checkHitboxTouch(hitbox, character) then
+                    if distance <= detectionRadius and isKillerHitbox(hitbox) then
+                        if checkHitboxTouch(hitbox) then
                             if not activeHitboxes[hitbox] then
                                 activeHitboxes[hitbox] = true
-                                
-                                -- 🔧 ЗАЩИЩЕННЫЙ ВЫЗОВ CALLBACK 🔧
-                                if type(callbackFunction) == "function" then
-                                    pcall(function()
-                                        callbackFunction(hitbox, localPlayer, character)
-                                    end)
-                                end
+                                safeCallback(hitbox, localPlayer, character)
                             end
                         else
                             activeHitboxes[hitbox] = nil
@@ -122,59 +97,50 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
                 end
             end
         end
-
-        local detectionConnection
-        detectionConnection = RunService.Heartbeat:Connect(function()
+        
+        local heartbeatConnection = RunService.Heartbeat:Connect(function()
             pcall(checkForHitboxes)
         end)
-
-        humanoid.Died:Connect(function()
-            if detectionConnection then
-                detectionConnection:Disconnect()
+        
+        local function cleanup()
+            if heartbeatConnection then
+                heartbeatConnection:Disconnect()
             end
             table.clear(activeHitboxes)
-            if isDetectionActive then
+        end
+        
+        humanoid.Died:Connect(function()
+            cleanup()
+            if isActive then
                 task.wait(3)
                 pcall(setupDetection)
             end
         end)
-
-        return function()
-            if detectionConnection then
-                detectionConnection:Disconnect()
-            end
-            table.clear(activeHitboxes)
-        end
-    end
-
-    local function initializeDetection()
-        local stopFunction
         
-        localPlayer.CharacterAdded:Connect(function(character)
-            if stopFunction then
-                stopFunction()
-            end
-            if isDetectionActive then
-                task.wait(1)
-                stopFunction = pcall(setupDetection) or nil
-            end
-        end)
-
-        if localPlayer.Character then
-            task.wait(1)
-            stopFunction = pcall(setupDetection) or nil
+        return cleanup
+    end
+    
+    local function initialize()
+        if not localPlayer.Character then
+            localPlayer.CharacterAdded:Wait()
+            task.wait(2)
         end
         
-        return stopFunction
+        local cleanupFunction = pcall(setupDetection)
+        if not cleanupFunction then
+            cleanupFunction = function() end
+        end
+        
+        return cleanupFunction
     end
-
-    currentDetectionConnection = initializeDetection()
+    
+    currentStopFunction = initialize()
     
     return function()
-        isDetectionActive = false
-        if currentDetectionConnection then
-            pcall(currentDetectionConnection)
-            currentDetectionConnection = nil
+        isActive = false
+        if currentStopFunction then
+            pcall(currentStopFunction)
+            currentStopFunction = nil
         end
     end
 end
