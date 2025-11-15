@@ -195,7 +195,6 @@ _G.ESPKiller = function(enabled)
         end
         
         ESP.Enabled = true
-        print("ESP activated for: " .. killer.Name)
         return true
         
     else
@@ -222,7 +221,6 @@ _G.ESPKiller = function(enabled)
         end
         
         ESP.CurrentKiller = nil
-        print("ESP deactivated")
         return true
     end
 end
