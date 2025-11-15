@@ -3,24 +3,11 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
 local KillerESP = {
-    Enabled = false,
+    Enabled = true,
     CurrentKiller = nil,
     Highlights = {},
-    Connections = {},
-    LastCommand = false -- Запоминаем последнюю команду
+    Connection = nil
 }
-
--- Основная функция для включения/выключения ESP
-function ESPKiller(enabled)
-    KillerESP.LastCommand = enabled -- Запоминаем команду
-    
-    if enabled then
-        return KillerESP:Initialize()
-    else
-        KillerESP:Cleanup()
-        return true
-    end
-end
 
 function KillerESP:FindKiller()
     local killersFolder = workspace:FindFirstChild("Players") and workspace.Players:FindFirstChild("Killers")
@@ -46,9 +33,9 @@ function KillerESP:HighlightPart(part)
     highlight.Name = "KillerPartHighlight"
     highlight.Adornee = part
     highlight.FillColor = Color3.new(1, 0, 0) -- Красный
-    highlight.FillTransparency = 0.7 -- Более прозрачный
+    highlight.FillTransparency = 0.4
     highlight.OutlineColor = Color3.new(1, 0.2, 0.2)
-    highlight.OutlineTransparency = 0.1 -- Немного прозрачная обводка
+    highlight.OutlineTransparency = 0
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     highlight.Parent = part
     
@@ -57,51 +44,36 @@ function KillerESP:HighlightPart(part)
 end
 
 function KillerESP:CreateNameTag(killer)
+    -- Используем имя убийцы (название модели)
     local killerName = killer.Name
-    -- Ищем голову для отслеживания
-    local head = killer:FindFirstChild("Head")
-    local humanoidRootPart = killer:FindFirstChild("HumanoidRootPart")
-    local trackingPart = head or humanoidRootPart or killer:FindFirstChildWhichIsA("BasePart")
+    local rootPart = killer:FindFirstChild("HumanoidRootPart") or 
+                     killer:FindFirstChild("Head") or 
+                     killer:FindFirstChildWhichIsA("BasePart")
     
-    if not trackingPart then 
-        warn("No tracking part found for killer: " .. killerName)
+    if not rootPart then 
+        warn("No root part found for killer: " .. killerName)
         return nil 
     end
     
-    -- Создаем BillboardGui с смещением выше головы
+    -- Создаем BillboardGui
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "KillerESP_" .. killerName
-    billboard.Adornee = trackingPart
-    billboard.Size = UDim2.new(0, 250, 0, 70)
-    
-    -- Поднимаем выше, чтобы не перекрывало модель
-    if head then
-        billboard.StudsOffset = Vector3.new(0, 4.5, 0) -- Выше головы
-    else
-        billboard.StudsOffset = Vector3.new(0, 4, 0) -- Выше для других частей
-    end
-    
+    billboard.Adornee = rootPart
+    billboard.Size = UDim2.new(0, 300, 0, 80)
+    billboard.StudsOffset = Vector3.new(0, 4, 0)
     billboard.AlwaysOnTop = true
     billboard.MaxDistance = 2000
-    billboard.Parent = trackingPart
-    
-    -- Фон для лучшей читаемости (полупрозрачный)
-    local background = Instance.new("Frame")
-    background.Size = UDim2.new(1, 0, 1, 0)
-    background.BackgroundColor3 = Color3.new(0, 0, 0)
-    background.BackgroundTransparency = 0.6 -- Прозрачный фон
-    background.BorderSizePixel = 0
-    background.Parent = billboard
+    billboard.Parent = rootPart
     
     -- Заголовок с именем убийцы
     local nameLabel = Instance.new("TextLabel")
     nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
     nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = "🔪 " .. killerName .. " 🔪"
+    nameLabel.Text = "🔪 " .. killerName .. " 🔪" -- Показываем имя модели
     nameLabel.TextColor3 = Color3.new(1, 0, 0)
-    nameLabel.TextStrokeTransparency = 0.3 -- Прозрачная обводка текста
+    nameLabel.TextStrokeTransparency = 0
     nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-    nameLabel.TextSize = 16
+    nameLabel.TextSize = 18
     nameLabel.Font = Enum.Font.GothamBlack
     nameLabel.Parent = billboard
     
@@ -110,11 +82,11 @@ function KillerESP:CreateNameTag(killer)
     distanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
     distanceLabel.Position = UDim2.new(0, 0, 0.5, 0)
     distanceLabel.BackgroundTransparency = 1
-    distanceLabel.Text = "Calculating..."
+    distanceLabel.Text = "Calculating distance..."
     distanceLabel.TextColor3 = Color3.new(1, 1, 1)
-    distanceLabel.TextStrokeTransparency = 0.3
+    distanceLabel.TextStrokeTransparency = 0
     distanceLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-    distanceLabel.TextSize = 12
+    distanceLabel.TextSize = 14
     distanceLabel.Font = Enum.Font.GothamBold
     distanceLabel.Parent = billboard
     
@@ -124,7 +96,7 @@ function KillerESP:CreateNameTag(killer)
         billboard = billboard,
         nameLabel = nameLabel,
         distanceLabel = distanceLabel,
-        trackingPart = trackingPart
+        rootPart = rootPart
     }
 end
 
@@ -153,16 +125,14 @@ function KillerESP:UpdateDistance()
     
     local localPlayer = Players.LocalPlayer
     local localCharacter = localPlayer.Character
-    local localHead = localCharacter and localCharacter:FindFirstChild("Head")
+    local localRoot = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
     
-    if not localHead or not self.CurrentKiller then return end
+    if not localRoot or not self.CurrentKiller then return end
     
-    local killerHead = self.CurrentKiller:FindFirstChild("Head")
-    local killerTrackingPart = self.NameTag.trackingPart
+    local killerRoot = self.NameTag.rootPart
+    if not killerRoot then return end
     
-    if not killerTrackingPart then return end
-    
-    local distance = (localHead.Position - killerTrackingPart.Position).Magnitude
+    local distance = (localRoot.Position - killerRoot.Position).Magnitude
     self.NameTag.distanceLabel.Text = "Distance: " .. math.floor(distance) .. "m"
     
     -- Меняем цвет в зависимости от расстояния
@@ -179,15 +149,13 @@ function KillerESP:UpdateDistance()
 end
 
 function KillerESP:Initialize()
-    if self.Enabled then
-        self:Cleanup() -- Очищаем перед повторной инициализацией
-    end
+    -- Очищаем старые подсветки
+    self:Cleanup()
     
     -- Ищем убийцу
     self.CurrentKiller = self:FindKiller()
     
     if not self.CurrentKiller then
-        print("No killer found, but ESP is enabled. Will retry...")
         return false
     end
     
@@ -203,96 +171,83 @@ function KillerESP:Initialize()
     local partsCount = self:HighlightAllParts(self.CurrentKiller)
     
     -- Запускаем обновление расстояния
-    self.Connections.distanceUpdate = RunService.Heartbeat:Connect(function()
+    self.Connection = RunService.Heartbeat:Connect(function()
         self:UpdateDistance()
     end)
     
-    -- ОТСЛЕЖИВАНИЕ УДАЛЕНИЯ УБИЙЦЫ - ИСПРАВЛЕННАЯ ЧАСТЬ
-    if self.CurrentKiller then
-        self.Connections.killerRemoved = self.CurrentKiller.AncestryChanged:Connect(function(_, parent)
-            if parent == nil then
-                print("Killer was removed, will auto-find new one...")
-                self:ScheduleReinitialize()
-            end
-        end)
-    end
-    
-    self.Enabled = true
     print("ESP successfully activated for: " .. self.CurrentKiller.Name)
     return true
 end
 
-function KillerESP:ScheduleReinitialize()
-    -- Планируем переинициализацию через 1 секунду
-    if self.Connections.reinitialize then
-        self.Connections.reinitialize:Disconnect()
-        self.Connections.reinitialize = nil
+function KillerESP:Toggle(enabled)
+    self.Enabled = enabled
+    
+    -- Включаем/выключаем все подсветки
+    for _, highlight in pairs(self.Highlights) do
+        highlight.Enabled = enabled
     end
     
-    self.Connections.reinitialize = RunService.Heartbeat:Connect(function()
-        wait(1) -- Ждем 1 секунду
-        if self.Connections.reinitialize then
-            self.Connections.reinitialize:Disconnect()
-            self.Connections.reinitialize = nil
-        end
-        
-        if self.LastCommand then -- Переинициализируем только если ESP было включено
-            print("Auto-reinitializing ESP...")
-            self:Initialize()
-        end
-    end)
+    if self.NameTag and self.NameTag.billboard then
+        self.NameTag.billboard.Enabled = enabled
+    end
 end
 
 function KillerESP:Cleanup()
-    self.Enabled = false
-    
-    -- Отключаем все соединения
-    for name, connection in pairs(self.Connections) do
-        if connection then
-            connection:Disconnect()
-            self.Connections[name] = nil
-        end
+    -- Отключаем соединение
+    if self.Connection then
+        self.Connection:Disconnect()
+        self.Connection = nil
     end
     
     -- Удаляем все подсветки
     for _, highlight in pairs(self.Highlights) do
-        if highlight and highlight.Parent then
-            highlight:Destroy()
-        end
+        highlight:Destroy()
     end
     self.Highlights = {}
     
     -- Удаляем тег с именем
-    if self.NameTag and self.NameTag.billboard and self.NameTag.billboard.Parent then
+    if self.NameTag and self.NameTag.billboard then
         self.NameTag.billboard:Destroy()
         self.NameTag = nil
     end
     
     self.CurrentKiller = nil
-    print("ESP cleaned up")
 end
 
--- Автоматическая проверка появления убийцы
+function KillerESP:Restart()
+    self:Cleanup()
+    wait(0.5)
+    return self:Initialize()
+end
+
+-- Автоматическая проверка появления/исчезновения убийцы
 local function startAutoRefresh()
     while true do
         wait(3) -- Проверяем каждые 3 секунды
         
-        -- Если ESP было включено командой, но сейчас нет убийцы - ищем снова
-        if KillerESP.LastCommand and not KillerESP.Enabled then
-            print("ESP is enabled but no killer found. Searching...")
-            KillerESP:Initialize()
-        end
+        local currentKillerExists = KillerESP.CurrentKiller and KillerESP.CurrentKiller.Parent
+        local killersFolderExists = workspace:FindFirstChild("Players") and workspace.Players:FindFirstChild("Killers")
         
-        -- Если ESP включено и убийца есть, но пропал - переинициализируем
-        if KillerESP.Enabled and KillerESP.CurrentKiller and not KillerESP.CurrentKiller.Parent then
-            print("Killer lost, reinitializing...")
-            KillerESP:ScheduleReinitialize()
+        if not currentKillerExists and killersFolderExists then
+            -- Убийца исчез или был удален
+            print("Killer disappeared, searching for new one...")
+            KillerESP:Restart()
+        elseif not killersFolderExists then
+            -- Папка убийц исчезла
+            KillerESP:Cleanup()
         end
     end
 end
 
--- Запускаем авто-обновление в фоне
-spawn(startAutoRefresh)
+-- Основная инициализация
+wait(2) -- Ждем загрузки игры
 
--- Экспортируем основную функцию
-return ESPKiller
+if KillerESP:Initialize() then
+    print("Killer ESP started successfully!")
+    spawn(startAutoRefresh)
+else
+    warn("Failed to initialize Killer ESP. Will retry automatically...")
+    spawn(startAutoRefresh)
+end
+
+return KillerESP
