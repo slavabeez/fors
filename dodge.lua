@@ -1,20 +1,15 @@
-print("V2")
+print("v3")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local localPlayer = Players.LocalPlayer
-local currentStopFunction = nil
 
-local function StartHitboxDetection(callbackFunction, radiusValue)
-    if currentStopFunction then
-        currentStopFunction()
-        currentStopFunction = nil
-    end
-    
-    if not callbackFunction or type(callbackFunction) ~= "function" then
-        warn("Invalid callback function")
-        return function() end
+local HitboxDetector = {}
+
+function HitboxDetector.Start(callbackFunction, radiusValue)
+    if HitboxDetector.Stop then
+        HitboxDetector.Stop()
     end
     
     local isActive = true
@@ -55,6 +50,8 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
                     touched = true
                 end
             end
+            
+            if not hitbox:IsA("BasePart") then return false end
             
             local originalCanTouch = hitbox.CanTouch
             hitbox.CanTouch = true
@@ -117,32 +114,35 @@ local function StartHitboxDetection(callbackFunction, radiusValue)
             end
         end)
         
+        localPlayer.CharacterRemoving:Connect(function()
+            cleanup()
+        end)
+        
         return cleanup
     end
     
-    local function initialize()
-        if not localPlayer.Character then
-            localPlayer.CharacterAdded:Wait()
+    local stopFunction = setupDetection()
+    
+    localPlayer.CharacterAdded:Connect(function()
+        if isActive then
             task.wait(2)
+            if stopFunction then
+                stopFunction()
+            end
+            stopFunction = setupDetection()
         end
-        
-        local cleanupFunction = pcall(setupDetection)
-        if not cleanupFunction then
-            cleanupFunction = function() end
-        end
-        
-        return cleanupFunction
-    end
+    end)
     
-    currentStopFunction = initialize()
-    
-    return function()
+    HitboxDetector.Stop = function()
         isActive = false
-        if currentStopFunction then
-            pcall(currentStopFunction)
-            currentStopFunction = nil
+        if stopFunction then
+            pcall(stopFunction)
+            stopFunction = nil
         end
+        HitboxDetector.Stop = nil
     end
+    
+    return HitboxDetector.Stop
 end
 
-return StartHitboxDetection
+return HitboxDetector
