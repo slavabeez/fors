@@ -1,4 +1,6 @@
-print("v3")
+-- HitboxDetector.lua
+-- Полностью совместим с ползунком Slider
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -7,142 +9,64 @@ local localPlayer = Players.LocalPlayer
 
 local HitboxDetector = {}
 
-function HitboxDetector.Start(callbackFunction, radiusValue)
-    if HitboxDetector.Stop then
-        HitboxDetector.Stop()
-    end
-    
+function HitboxDetector.Start(callback, radius)
     local isActive = true
-    local detectionRadius = radiusValue or 10
-    
-    local function safeCallback(...)
-        if isActive and callbackFunction then
-            pcall(callbackFunction, ...)
+    local detectionRadius = radius or 5
+
+    local character = localPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+
+    -- Подписываемся на изменения персонажа
+    local charAddedConn = localPlayer.CharacterAdded:Connect(function(char)
+        character = char
+        root = char:WaitForChild("HumanoidRootPart", 3)
+    end)
+
+    local hitboxFolder = Workspace:FindFirstChild("Hitboxes")
+
+    -- Защита: ждём если Hitboxes ещё нет
+    if not hitboxFolder then
+        hitboxFolder = Workspace.ChildAdded:Wait()
+        if hitboxFolder.Name ~= "Hitboxes" then
+            hitboxFolder = Workspace:WaitForChild("Hitboxes")
         end
     end
-    
-    local function setupDetection()
+
+    local function isValidHitbox(part)
+        if not part:IsA("BasePart") then return false end
+        if part:GetAttribute("Hidden") == true then return false end
+        if string.find(part.Name, localPlayer.Name) then return false end
+        return true
+    end
+
+    local function checkHitboxDistance(hitbox)
+        if not character or not root then return false end
+        if not hitbox or not hitbox.Parent then return false end
+
+        local distance = (hitbox.Position - root.Position).Magnitude
+        return distance <= detectionRadius
+    end
+
+    local heartbeatConn = RunService.Heartbeat:Connect(function()
         if not isActive then return end
-        
-        local character = localPlayer.Character
-        if not character then return end
-        
-        local humanoid = character:FindFirstChild("Humanoid")
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if not humanoid or not rootPart or humanoid.Health <= 0 then return end
-        
-        local activeHitboxes = {}
-        
-        local function isKillerHitbox(hitbox)
-            if not hitbox then return false end
-            if hitbox.Name:find(localPlayer.Name) then return false end
-            return true
-        end
-        
-        local function checkHitboxTouch(hitbox)
-            if not hitbox then return false end
-            
-            local touched = false
-            local touchConnection
-            
-            local function onTouched(otherPart)
-                if otherPart and otherPart.Parent == character then
-                    touched = true
-                end
+        if not character or not root then return end
+        if not hitboxFolder then return end
+
+        for _, hitbox in ipairs(hitboxFolder:GetChildren()) do
+            if isValidHitbox(hitbox) and checkHitboxDistance(hitbox) then
+                callback(hitbox, localPlayer, character)
             end
-            
-            if not hitbox:IsA("BasePart") then return false end
-            
-            local originalCanTouch = hitbox.CanTouch
-            hitbox.CanTouch = true
-            touchConnection = hitbox.Touched:Connect(onTouched)
-            
-            RunService.Heartbeat:Wait()
-            
-            hitbox.CanTouch = originalCanTouch
-            if touchConnection then
-                touchConnection:Disconnect()
-            end
-            
-            return touched
-        end
-        
-        local function checkForHitboxes()
-            if not isActive or not character or not rootPart then return end
-            
-            local hitboxesFolder = Workspace:FindFirstChild("Hitboxes")
-            if not hitboxesFolder then return end
-            
-            for _, hitbox in ipairs(hitboxesFolder:GetChildren()) do
-                if not isActive then break end
-                
-                if hitbox:IsA("BasePart") and not hitbox:GetAttribute("Hidden") then
-                    local distance = (hitbox.Position - rootPart.Position).Magnitude
-                    
-                    if distance <= detectionRadius and isKillerHitbox(hitbox) then
-                        if checkHitboxTouch(hitbox) then
-                            if not activeHitboxes[hitbox] then
-                                activeHitboxes[hitbox] = true
-                                safeCallback(hitbox, localPlayer, character)
-                            end
-                        else
-                            activeHitboxes[hitbox] = nil
-                        end
-                    else
-                        activeHitboxes[hitbox] = nil
-                    end
-                end
-            end
-        end
-        
-        local heartbeatConnection = RunService.Heartbeat:Connect(function()
-            pcall(checkForHitboxes)
-        end)
-        
-        local function cleanup()
-            if heartbeatConnection then
-                heartbeatConnection:Disconnect()
-            end
-            table.clear(activeHitboxes)
-        end
-        
-        humanoid.Died:Connect(function()
-            cleanup()
-            if isActive then
-                task.wait(3)
-                pcall(setupDetection)
-            end
-        end)
-        
-        localPlayer.CharacterRemoving:Connect(function()
-            cleanup()
-        end)
-        
-        return cleanup
-    end
-    
-    local stopFunction = setupDetection()
-    
-    localPlayer.CharacterAdded:Connect(function()
-        if isActive then
-            task.wait(2)
-            if stopFunction then
-                stopFunction()
-            end
-            stopFunction = setupDetection()
         end
     end)
-    
-    HitboxDetector.Stop = function()
+
+    -- Функция остановки
+    local function stop()
         isActive = false
-        if stopFunction then
-            pcall(stopFunction)
-            stopFunction = nil
-        end
-        HitboxDetector.Stop = nil
+        if heartbeatConn then heartbeatConn:Disconnect() end
+        if charAddedConn then charAddedConn:Disconnect() end
     end
-    
-    return HitboxDetector.Stop
+
+    return stop
 end
 
 return HitboxDetector
