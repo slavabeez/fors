@@ -1,36 +1,46 @@
--- Animation Detector Module - ИСПРАВЛЕННЫЙ
+-- Animation Detector Module
 local AnimationDetector = {}
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 function AnimationDetector.Start(callback, radius)
     local localPlayer = Players.LocalPlayer
     local stopTracking = false
     local trackedAnimations = {}
     
-    -- Таблица для сопоставления AnimationId с названиями анимаций
-    local animationIdToName = {}
+    -- Ключевые слова анимаций передвижения для исключения
+    local movementKeywords = {
+        "Walk", "Run", "Idle", "Injured", "Better", "Movement", "Move"
+    }
     
-    -- Функция для определения убийцы
-    local function isKiller(actor)
-        if not actor or not actor.Config then return false end
-        
-        -- Проверяем по Class или наличию анимаций атаки
-        if actor.Config.Class and actor.Config.Class:lower():find("killer") then
-            return true
-        end
-        
-        -- Проверяем по наличию анимаций атаки в Config
-        if actor.Config.Animations then
-            for animName, animData in pairs(actor.Config.Animations) do
-                if animName:find("Slash") or animName:find("Attack") or animName:find("Execution") then
-                    return true
+    -- Функция для проверки, является ли анимация передвижением
+    local function isMovementAnimation(animationId, animator)
+        -- Проверяем по длине анимации (анимации передвижения обычно длинные и зациклены)
+        if animator then
+            for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                if track.Animation.AnimationId == animationId then
+                    -- Анимации передвижения обычно длиннее 2 секунд
+                    if track.Length > 2 then
+                        return true
+                    end
                 end
             end
         end
-        
         return false
+    end
+    
+    -- Функция для получения убийцы из папки Killers
+    local function getKillerFromFolder()
+        local killersFolder = Workspace.Players:FindFirstChild("Killers")
+        if not killersFolder then return nil end
+        
+        local killers = killersFolder:GetChildren()
+        if #killers > 0 then
+            return killers[1] -- Берем первого убийцу
+        end
+        return nil
     end
 
     local function trackKillerAnimations()
@@ -41,15 +51,23 @@ function AnimationDetector.Start(callback, radius)
             local character = localPlayer.Character
             if not character or not character.PrimaryPart then return end
             
+            -- Получаем убийцу из папки Killers
+            local killerModel = getKillerFromFolder()
+            if not killerModel then
+                -- print("❌ Убийца не найден в папке Killers")
+                return
+            end
+            
             local actorsModule = require(game.ReplicatedStorage.Modules.Actors)
             
+            -- Проверяем всех игроков
             for player, actor in pairs(actorsModule.CurrentActors) do
-                if player ~= localPlayer and isKiller(actor) and actor.Rig then
+                if player ~= localPlayer and actor and actor.Rig then
                     local otherCharacter = actor.Rig
                     local distance = (character.PrimaryPart.Position - otherCharacter.PrimaryPart.Position).Magnitude
                     
-                    if distance <= radius then
-                        -- СПОСОБ 1: Отслеживаем через Animator по реальным AnimationId
+                    -- Сравниваем риг игрока с ригом убийцы из папки Killers
+                    if otherCharacter.Name == killerModel.Name and distance <= radius then
                         local humanoid = otherCharacter:FindFirstChildOfClass("Humanoid")
                         if humanoid then
                             local animator = humanoid:FindFirstChildOfClass("Animator")
@@ -57,53 +75,30 @@ function AnimationDetector.Start(callback, radius)
                                 for _, animTrack in ipairs(animator:GetPlayingAnimationTracks()) do
                                     if animTrack.IsPlaying then
                                         pcall(function()
-                                            local animId = tostring(animTrack.Animation.AnimationId)
-                                            local animName = animationIdToName[animId] or animId
-                                            local animKey = player.Name .. "_" .. animId
+                                            local animId = animTrack.Animation.AnimationId
+                                            local animKey = player.Name .. "_" .. tostring(animId)
                                             
                                             if not trackedAnimations[animKey] then
-                                                trackedAnimations[animKey] = true
-                                                
-                                                -- Определяем тип анимации по ID или названию
-                                                local isAttackAnimation = false
-                                                
-                                                -- Проверяем по ID (можно добавить известные ID атак)
-                                                if animId:find("132653655520682") or  -- Пример ID атаки
-                                                   animId:find("115946474977409") or  -- Пример ID атаки  
-                                                   animId:find("108018357044094") then -- Пример ID атаки
-                                                    isAttackAnimation = true
-                                                end
-                                                
-                                                -- Проверяем по названию из кэша
-                                                if actor.Cache then
-                                                    for cachedName, cachedTrack in pairs(actor.Cache) do
-                                                        if cachedTrack == animTrack then
-                                                            animName = cachedName
-                                                            if cachedName:find("Slash") or 
-                                                               cachedName:find("Attack") or 
-                                                               cachedName:find("Execution") or
-                                                               cachedName:find("Punch") then
-                                                                isAttackAnimation = true
-                                                            end
-                                                            animationIdToName[animId] = cachedName
-                                                            break
-                                                        end
-                                                    end
-                                                end
-                                                
-                                                -- Если это анимация атаки, вызываем callback
-                                                if isAttackAnimation then
-                                                    pcall(callback, animTrack, player, otherCharacter, animName)
+                                                -- Пропускаем анимации передвижения
+                                                if not isMovementAnimation(animId, animator) then
+                                                    trackedAnimations[animKey] = true
                                                     
-                                                    print("🎯 Анимация убийцы обнаружена!")
+                                                    -- Вызываем callback для НЕ-передвиженческой анимации убийцы
+                                                    pcall(callback, animTrack, player, otherCharacter, tostring(animId))
+                                                    
+                                                    print("🎯 ОБНАРУЖЕНА АНИМАЦИЯ УБИЙЦЫ!")
                                                     print("👤 Убийца:", player.Name)
-                                                    print("🎭 Анимация:", animName)
-                                                    print("🆔 ID:", animId)
+                                                    print("🎭 Риг:", otherCharacter.Name)
+                                                    print("🆔 ID анимации:", animId)
                                                     print("📍 Дистанция:", string.format("%.1f", distance))
+                                                    print("✅ Совпадение с убийцей из папки Killers!")
                                                     
+                                                    -- Автоочистка через 2 секунды
                                                     task.delay(2, function()
                                                         trackedAnimations[animKey] = nil
                                                     end)
+                                                else
+                                                    print("🚶 Пропущена анимация передвижения:", animId)
                                                 end
                                             end
                                         end)
@@ -132,13 +127,44 @@ function AnimationDetector.Start(callback, radius)
     return stopFunction
 end
 
--- Упрощенная версия - отслеживает ВСЕ анимации убийцы
-function AnimationDetector.StartSimple(callback, radius)
+-- Улучшенная версия с дополнительной диагностикой
+function AnimationDetector.StartWithDiagnostics(callback, radius)
     local localPlayer = Players.LocalPlayer
     local stopTracking = false
     local trackedAnimations = {}
 
-    local function trackAllKillerAnimations()
+    local function getKillerFromFolder()
+        local killersFolder = Workspace.Players:FindFirstChild("Killers")
+        if not killersFolder then 
+            print("❌ Папка Killers не найдена!")
+            return nil 
+        end
+        
+        local killers = killersFolder:GetChildren()
+        print("🔍 Найдено в папке Killers:", #killers)
+        for i, killer in ipairs(killers) do
+            print("  " .. i .. ". " .. killer.Name)
+        end
+        
+        if #killers > 0 then
+            return killers[1]
+        end
+        return nil
+    end
+
+    local function isMovementAnimation(animId, animator)
+        -- Проверяем по длине (передвижение > 2 сек)
+        if animator then
+            for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                if track.Animation.AnimationId == animId and track.Length > 2 then
+                    return true
+                end
+            end
+        end
+        return false
+    end
+
+    local function trackKillerAnimations()
         local connection
         connection = RunService.Heartbeat:Connect(function()
             if stopTracking then return end
@@ -146,39 +172,57 @@ function AnimationDetector.StartSimple(callback, radius)
             local character = localPlayer.Character
             if not character or not character.PrimaryPart then return end
             
+            local killerModel = getKillerFromFolder()
+            if not killerModel then return end
+            
             local actorsModule = require(game.ReplicatedStorage.Modules.Actors)
             
             for player, actor in pairs(actorsModule.CurrentActors) do
-                -- Простая проверка: если не локальный игрок и есть риг - считаем убийцей
                 if player ~= localPlayer and actor and actor.Rig then
                     local otherCharacter = actor.Rig
                     local distance = (character.PrimaryPart.Position - otherCharacter.PrimaryPart.Position).Magnitude
                     
-                    if distance <= radius then
-                        local humanoid = otherCharacter:FindFirstChildOfClass("Humanoid")
-                        if humanoid then
-                            local animator = humanoid:FindFirstChildOfClass("Animator")
-                            if animator then
-                                for _, animTrack in ipairs(animator:GetPlayingAnimationTracks()) do
-                                    if animTrack.IsPlaying then
-                                        pcall(function()
-                                            local animId = tostring(animTrack.Animation.AnimationId)
-                                            local animKey = player.Name .. "_" .. animId
-                                            
-                                            if not trackedAnimations[animKey] then
-                                                trackedAnimations[animKey] = true
+                    -- КРИТИЧЕСКАЯ ПРОВЕРКА: сравниваем имя рига с именем убийцы из папки
+                    if otherCharacter.Name == killerModel.Name then
+                        print("✅ НАЙДЕН УБИЙЦА:", player.Name, "Риг:", otherCharacter.Name)
+                        
+                        if distance <= radius then
+                            local humanoid = otherCharacter:FindFirstChildOfClass("Humanoid")
+                            if humanoid then
+                                local animator = humanoid:FindFirstChildOfClass("Animator")
+                                if animator then
+                                    local tracks = animator:GetPlayingAnimationTracks()
+                                    if #tracks > 0 then
+                                        print("🎭 Анимаций у убийцы:", #tracks)
+                                    end
+                                    
+                                    for _, animTrack in ipairs(tracks) do
+                                        if animTrack.IsPlaying then
+                                            pcall(function()
+                                                local animId = animTrack.Animation.AnimationId
+                                                local animKey = player.Name .. "_" .. tostring(animId)
                                                 
-                                                -- Вызываем callback для ЛЮБОЙ анимации убийцы
-                                                pcall(callback, animTrack, player, otherCharacter, animId)
-                                                
-                                                print("⚡ Анимация убийцы! ID:", animId)
-                                                print("👤 Убийца:", player.Name)
-                                                
-                                                task.delay(1.5, function()
-                                                    trackedAnimations[animKey] = nil
-                                                end)
-                                            end
-                                        end)
+                                                if not trackedAnimations[animKey] then
+                                                    -- Проверяем длину анимации
+                                                    local isMovement = isMovementAnimation(animId, animator)
+                                                    
+                                                    if not isMovement then
+                                                        trackedAnimations[animKey] = true
+                                                        pcall(callback, animTrack, player, otherCharacter, tostring(animId))
+                                                        
+                                                        print("⚡ ВЫЗВАН CALLBACK! Анимация убийцы!")
+                                                        print("🆔 ID:", animId)
+                                                        print("📏 Длина:", animTrack.Length)
+                                                        
+                                                        task.delay(2, function()
+                                                            trackedAnimations[animKey] = nil
+                                                        end)
+                                                    else
+                                                        print("🚶 Пропущена (длина " .. animTrack.Length .. " сек):", animId)
+                                                    end
+                                                end
+                                            end)
+                                        end
                                     end
                                 end
                             end
@@ -190,7 +234,7 @@ function AnimationDetector.StartSimple(callback, radius)
         return connection
     end
     
-    local heartbeatConnection = trackAllKillerAnimations()
+    local heartbeatConnection = trackKillerAnimations()
     
     local function stopFunction()
         stopTracking = true
@@ -200,6 +244,7 @@ function AnimationDetector.StartSimple(callback, radius)
         trackedAnimations = {}
     end
     
+    print("🎯 Отслеживание анимаций убийцы ЗАПУЩЕНО! Радиус: " .. radius .. " studs")
     return stopFunction
 end
 
