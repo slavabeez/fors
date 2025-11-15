@@ -50,26 +50,38 @@ _G.ESPGenerators = function(enabled)
             return false 
         end
         
-        -- Переименовываем и собираем настоящие генераторы
-        local generatorCount = 1
+        -- Собираем настоящие генераторы (Generator1, Generator2, ..., Generator5)
         local generators = {}
         local fakeGenerators = {}
         
-        for _, child in pairs(mapFolder:GetChildren()) do
-            if child.Name == "Generator" then
-                -- Переименовываем генераторы
-                local newName = "Generator" .. generatorCount
-                while mapFolder:FindFirstChild(newName) do
-                    generatorCount = generatorCount + 1
-                    newName = "Generator" .. generatorCount
-                end
-                child.Name = newName
-                table.insert(generators, child)
-                generatorCount = generatorCount + 1
-                
-            elseif child.Name == "FakeGenerator" then
-                table.insert(fakeGenerators, child)
+        for i = 1, 5 do
+            local generatorName = "Generator" .. i
+            local generator = mapFolder:FindFirstChild(generatorName)
+            if generator then
+                table.insert(generators, generator)
             end
+        end
+        
+        -- Также проверяем базовое имя "Generator" на случай нового генератора
+        local baseGenerator = mapFolder:FindFirstChild("Generator")
+        if baseGenerator then
+            -- Переименовываем новый генератор
+            local newName = "Generator1"
+            local count = 1
+            while mapFolder:FindFirstChild(newName) do
+                count = count + 1
+                newName = "Generator" .. count
+            end
+            if count <= 5 then
+                baseGenerator.Name = newName
+                table.insert(generators, baseGenerator)
+            end
+        end
+        
+        -- Ищем фейковые генераторы
+        local fakeGenerator = mapFolder:FindFirstChild("FakeGenerator")
+        if fakeGenerator then
+            table.insert(fakeGenerators, fakeGenerator)
         end
         
         if #generators == 0 and #fakeGenerators == 0 then
@@ -270,8 +282,26 @@ _G.ESPGenerators = function(enabled)
             wait(0.5) -- Ждем немного для инициализации
             
             if ESP.LastCommand then
-                if child.Name == "Generator" or child.Name == "FakeGenerator" then
+                if child.Name == "Generator" or child.Name:match("Generator%d") then
+                    -- Если это новый Generator, переименовываем его
+                    if child.Name == "Generator" then
+                        local newName = "Generator1"
+                        local count = 1
+                        while mapFolder:FindFirstChild(newName) do
+                            count = count + 1
+                            newName = "Generator" .. count
+                        end
+                        if count <= 5 then
+                            child.Name = newName
+                        end
+                    end
+                    
                     -- Перезапускаем ESP для включения нового генератора
+                    wait(1)
+                    _G.ESPGenerators(true)
+                elseif child.Name == "FakeGenerator" then
+                    -- Перезапускаем ESP для включения нового фейк-генератора
+                    wait(1)
                     _G.ESPGenerators(true)
                 end
             end
@@ -287,6 +317,7 @@ _G.ESPGenerators = function(enabled)
                     ESP.NameTags[child] = nil
                     
                     -- Перезапускаем ESP для обновления списка
+                    wait(1)
                     _G.ESPGenerators(true)
                 end
             end
@@ -356,19 +387,26 @@ spawn(function()
                         end
                     end
                     
-                    -- Проверяем появление новых генераторов
-                    for _, child in pairs(mapFolder:GetChildren()) do
-                        if (child.Name == "Generator" or child.Name:find("Generator%d")) and child.Name ~= "FakeGenerator" then
-                            if not ESP.NameTags[child] then
-                                needsRefresh = true
-                                break
-                            end
-                        elseif child.Name == "FakeGenerator" then
-                            if not ESP.NameTags[child] then
-                                needsRefresh = true
-                                break
-                            end
+                    -- Проверяем появление новых генераторов (Generator1-5 и FakeGenerator)
+                    for i = 1, 5 do
+                        local generatorName = "Generator" .. i
+                        local generator = mapFolder:FindFirstChild(generatorName)
+                        if generator and not ESP.NameTags[generator] then
+                            needsRefresh = true
+                            break
                         end
+                    end
+                    
+                    -- Проверяем FakeGenerator
+                    local fakeGenerator = mapFolder:FindFirstChild("FakeGenerator")
+                    if fakeGenerator and not ESP.NameTags[fakeGenerator] then
+                        needsRefresh = true
+                    end
+                    
+                    -- Проверяем базовый Generator (непереименованный)
+                    local baseGenerator = mapFolder:FindFirstChild("Generator")
+                    if baseGenerator then
+                        needsRefresh = true
                     end
                 end
                 
