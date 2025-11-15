@@ -3,17 +3,18 @@
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
--- Создаем глобальную таблицу
-_G.KillerESP = {
-    Enabled = false,
-    CurrentKiller = nil,
-    Highlights = {},
-    Connections = {},
-    LastCommand = false
-}
-
--- Глобальная функция ESPKiller
+-- Создаем глобальную функцию сразу
 _G.ESPKiller = function(enabled)
+    if not _G.KillerESP then
+        _G.KillerESP = {
+            Enabled = false,
+            CurrentKiller = nil,
+            Highlights = {},
+            Connections = {},
+            LastCommand = false
+        }
+    end
+    
     local ESP = _G.KillerESP
     ESP.LastCommand = enabled
     
@@ -42,6 +43,7 @@ _G.ESPKiller = function(enabled)
         -- Ищем убийцу
         local killersFolder = workspace:FindFirstChild("Players") and workspace.Players:FindFirstChild("Killers")
         if not killersFolder then 
+            warn("Killers folder not found!")
             return false 
         end
         
@@ -54,6 +56,7 @@ _G.ESPKiller = function(enabled)
         end
         
         if not killer then
+            warn("No killer found!")
             return false
         end
         
@@ -65,6 +68,7 @@ _G.ESPKiller = function(enabled)
                          killer:FindFirstChildWhichIsA("BasePart")
         
         if not rootPart then 
+            warn("No root part found!")
             return false 
         end
         
@@ -193,6 +197,7 @@ _G.ESPKiller = function(enabled)
         end
         
         ESP.Enabled = true
+        print("ESP activated for: " .. killer.Name)
         return true
         
     else
@@ -219,6 +224,7 @@ _G.ESPKiller = function(enabled)
         end
         
         ESP.CurrentKiller = nil
+        print("ESP deactivated")
         return true
     end
 end
@@ -227,29 +233,29 @@ end
 spawn(function()
     while true do
         wait(3)
-        local ESP = _G.KillerESP
-        
-        if ESP.LastCommand and not ESP.Enabled then
-            _G.ESPKiller(true)
-        end
-        
-        if ESP.Enabled and ESP.CurrentKiller and not ESP.CurrentKiller.Parent then
-            if ESP.Connections.reinitialize then
-                ESP.Connections.reinitialize:Disconnect()
+        if _G.KillerESP then
+            local ESP = _G.KillerESP
+            
+            if ESP.LastCommand and not ESP.Enabled then
+                _G.ESPKiller(true)
             end
             
-            ESP.Connections.reinitialize = RunService.Heartbeat:Connect(function()
-                wait(1)
+            if ESP.Enabled and ESP.CurrentKiller and not ESP.CurrentKiller.Parent then
                 if ESP.Connections.reinitialize then
                     ESP.Connections.reinitialize:Disconnect()
                 end
                 
-                if ESP.LastCommand then
-                    _G.ESPKiller(true)
-                end
-            end)
+                ESP.Connections.reinitialize = RunService.Heartbeat:Connect(function()
+                    wait(1)
+                    if ESP.Connections.reinitialize then
+                        ESP.Connections.reinitialize:Disconnect()
+                    end
+                    
+                    if ESP.LastCommand then
+                        _G.ESPKiller(true)
+                    end
+                end)
+            end
         end
     end
 end)
-
-print("ESPKiller loaded! Use ESPKiller(true/false) anywhere!")
