@@ -324,7 +324,6 @@ _G.ESPGenerators = function(enabled)
         end)
         
         ESP.Enabled = true
-        print("Generators ESP activated: " .. #generators .. " real, " .. #fakeGenerators .. " fake")
         return true
         
     else
@@ -356,7 +355,6 @@ _G.ESPGenerators = function(enabled)
         
         ESP.Generators = {}
         ESP.FakeGenerators = {}
-        print("Generators ESP deactivated")
         return true
     end
 end
