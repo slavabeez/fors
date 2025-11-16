@@ -1,7 +1,6 @@
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
--- Создаем глобальную функцию для предметов
 _G.ESPItems = function(enabled)
     if not _G.ItemsESP then
         _G.ItemsESP = {
@@ -18,7 +17,6 @@ _G.ESPItems = function(enabled)
     ESP.LastCommand = enabled
     
     if enabled then
-        -- Включение ESP
         if ESP.Enabled then
             -- Очищаем перед повторной инициализацией
             for name, connection in pairs(ESP.Connections) do
@@ -41,34 +39,30 @@ _G.ESPItems = function(enabled)
             ESP.Items = {}
         end
         
-        -- Ищем предметы
         local mapFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Ingame") and workspace.Map.Ingame:FindFirstChild("Map")
         if not mapFolder then 
             return false 
         end
         
-        -- Собираем все предметы с одинаковыми названиями
         local items = {}
         
-        -- Ищем все Medkit
         for _, medkit in pairs(mapFolder:GetChildren()) do
             if medkit.Name == "Medkit" then
                 table.insert(items, {
                     Object = medkit,
                     Type = "Medkit",
-                    Color = Color3.new(0.5, 0, 0.5), -- Фиолетовый для Medkit
+                    Color = Color3.new(0.5, 0, 0.5),
                     DisplayName = "Medkit"
                 })
             end
         end
         
-        -- Ищем все BloxyCola
         for _, bloxyCola in pairs(mapFolder:GetChildren()) do
             if bloxyCola.Name == "BloxyCola" then
                 table.insert(items, {
                     Object = bloxyCola,
                     Type = "BloxyCola", 
-                    Color = Color3.new(0.5, 0, 0.5), -- Фиолетовый для BloxyCola
+                    Color = Color3.new(0.5, 0, 0.5),
                     DisplayName = "Bloxy Cola"
                 })
             end
@@ -80,7 +74,6 @@ _G.ESPItems = function(enabled)
         
         ESP.Items = items
         
-        -- Функция для создания ESP объекта
         local function createItemESP(itemData)
             local item = itemData.Object
             local rootPart = item:FindFirstChildWhichIsA("BasePart")
@@ -88,10 +81,8 @@ _G.ESPItems = function(enabled)
                 return nil
             end
             
-            -- Создаем уникальный идентификатор для объекта
             local objectId = tostring(item):gsub(" ", "_")
             
-            -- BillboardGui
             local billboard = Instance.new("BillboardGui")
             billboard.Name = "ItemESP_" .. objectId
             billboard.Adornee = rootPart
@@ -100,16 +91,14 @@ _G.ESPItems = function(enabled)
             billboard.AlwaysOnTop = true
             billboard.MaxDistance = 2000
             billboard.Parent = rootPart
-            
-            -- Фон - ПРОЗРАЧНЫЙ
+
             local background = Instance.new("Frame")
             background.Size = UDim2.new(1, 0, 1, 0)
             background.BackgroundColor3 = Color3.new(0, 0, 0)
             background.BackgroundTransparency = 1.0
             background.BorderSizePixel = 0
             background.Parent = billboard
-            
-            -- Название предмета
+
             local nameLabel = Instance.new("TextLabel")
             nameLabel.Size = UDim2.new(1, 0, 0.6, 0)
             nameLabel.BackgroundTransparency = 1
@@ -120,8 +109,7 @@ _G.ESPItems = function(enabled)
             nameLabel.TextSize = 16
             nameLabel.Font = Enum.Font.GothamBold
             nameLabel.Parent = billboard
-            
-            -- Дистанция
+
             local distanceLabel = Instance.new("TextLabel")
             distanceLabel.Size = UDim2.new(1, 0, 0.4, 0)
             distanceLabel.Position = UDim2.new(0, 0, 0.6, 0)
@@ -143,7 +131,6 @@ _G.ESPItems = function(enabled)
                 objectId = objectId
             }
             
-            -- Подсветка предмета (фиолетовый)
             local highlight = Instance.new("Highlight")
             highlight.Name = "ItemHighlight_" .. objectId
             highlight.Adornee = item
@@ -159,15 +146,13 @@ _G.ESPItems = function(enabled)
             return espData
         end
         
-        -- Создаем ESP для всех предметов
         for _, itemData in pairs(items) do
             local espData = createItemESP(itemData)
             if espData then
                 ESP.NameTags[itemData.Object] = espData
             end
         end
-        
-        -- Обновление расстояния
+
         ESP.Connections.update = RunService.Heartbeat:Connect(function()
             if not ESP.Enabled or not ESP.NameTags then return end
             
@@ -182,16 +167,13 @@ _G.ESPItems = function(enabled)
                     continue
                 end
                 
-                -- Проверяем что объект все еще существует
                 if not item.Parent then
                     continue
                 end
-                
-                -- Обновление расстояния
+
                 local distance = (localRoot.Position - espData.rootPart.Position).Magnitude
                 espData.distanceLabel.Text = math.floor(distance) .. "m"
                 
-                -- Цвет дистанции
                 if distance < 10 then
                     espData.distanceLabel.TextColor3 = Color3.new(0, 1, 0)
                 elseif distance < 25 then
@@ -202,7 +184,6 @@ _G.ESPItems = function(enabled)
             end
         end)
         
-        -- Отслеживание изменений в папке предметов
         ESP.Connections.childAdded = mapFolder.ChildAdded:Connect(function(child)
             wait(0.5)
             
@@ -228,7 +209,6 @@ _G.ESPItems = function(enabled)
             end
         end)
         
-        -- Отслеживание удаления через AncestryChanged
         for item, espData in pairs(ESP.NameTags) do
             ESP.Connections["ancestry_" .. espData.objectId] = item.AncestryChanged:Connect(function(_, parent)
                 if parent == nil then
@@ -251,7 +231,7 @@ _G.ESPItems = function(enabled)
         return true
         
     else
-        -- Выключение ESP
+
         ESP.Enabled = false
         
         for name, connection in pairs(ESP.Connections) do
@@ -282,7 +262,6 @@ _G.ESPItems = function(enabled)
     end
 end
 
--- Авто-обновление
 spawn(function()
     while true do
         wait(3)
@@ -298,7 +277,6 @@ spawn(function()
                 local mapFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Ingame") and workspace.Map.Ingame:FindFirstChild("Map")
                 
                 if mapFolder then
-                    -- Проверяем существование всех отслеживаемых объектов
                     for item in pairs(ESP.NameTags) do
                         if not item.Parent then
                             needsRefresh = true
@@ -306,7 +284,6 @@ spawn(function()
                         end
                     end
                     
-                    -- Проверяем появление новых объектов
                     local currentMedkits = {}
                     local currentBloxyColas = {}
                     
@@ -318,7 +295,6 @@ spawn(function()
                         end
                     end
                     
-                    -- Проверяем Medkit
                     for _, medkit in pairs(currentMedkits) do
                         if not ESP.NameTags[medkit] then
                             needsRefresh = true
@@ -326,7 +302,6 @@ spawn(function()
                         end
                     end
                     
-                    -- Проверяем BloxyCola
                     for _, bloxyCola in pairs(currentBloxyColas) do
                         if not ESP.NameTags[bloxyCola] then
                             needsRefresh = true
