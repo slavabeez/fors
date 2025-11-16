@@ -46,7 +46,6 @@ _G.ESPGenerators = function(enabled)
         -- Ищем генераторы
         local mapFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Ingame") and workspace.Map.Ingame:FindFirstChild("Map")
         if not mapFolder then 
-            warn("Map folder not found!")
             return false 
         end
         
@@ -85,7 +84,6 @@ _G.ESPGenerators = function(enabled)
         end
         
         if #generators == 0 and #fakeGenerators == 0 then
-            warn("No generators found!")
             return false
         end
         
@@ -96,14 +94,12 @@ _G.ESPGenerators = function(enabled)
         local function createGeneratorESP(generator, isFake)
             local rootPart = generator:FindFirstChildWhichIsA("BasePart")
             if not rootPart then 
-                warn("No root part found for generator: " .. generator.Name)
                 return nil
             end
             
             -- Ищем Progress StringValue
             local progressValue = generator:FindFirstChild("Progress")
             if not progressValue or not progressValue:IsA("StringValue") then
-                warn("No Progress StringValue found for generator: " .. generator.Name)
             end
             
             -- BillboardGui
