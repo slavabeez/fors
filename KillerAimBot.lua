@@ -63,7 +63,7 @@ local function findNearestSurvivor(killerPosition)
         local humanoidRootPart = survivor:FindFirstChild("HumanoidRootPart")
         if humanoidRootPart then
             local distance = (killerPosition - humanoidRootPart.Position).Magnitude
-            if distance < shortestDistance then
+            if distance < (shortestDistance or math.huge) then
                 shortestDistance = distance
                 nearestSurvivor = survivor
             end
@@ -79,7 +79,6 @@ local function lookAtTarget(killer, targetPosition)
     
     local killerPosition = humanoidRootPart.Position
     
-    -- Применяем смещение по высоте
     local targetWithOffset = Vector3.new(
         targetPosition.X,
         targetPosition.Y + _G.KillerAimBot.Settings.AimHeightOffset,
@@ -89,7 +88,6 @@ local function lookAtTarget(killer, targetPosition)
     local direction = (targetWithOffset - killerPosition).Unit
     
     if _G.KillerAimBot.Settings.SmoothAim then
-        -- Плавный поворот
         local currentLook = humanoidRootPart.CFrame.LookVector
         local smoothFactor = _G.KillerAimBot.Settings.Smoothness
         local smoothedDirection = currentLook:Lerp(direction, smoothFactor)
@@ -99,7 +97,6 @@ local function lookAtTarget(killer, targetPosition)
             humanoidRootPart.CFrame = CFrame.new(killerPosition, killerPosition + lookVector)
         end
     else
-        -- Мгновенный поворот
         local lookVector = Vector3.new(direction.X, 0, direction.Z)
         if lookVector.Magnitude > 0 then
             humanoidRootPart.CFrame = CFrame.new(killerPosition, killerPosition + lookVector)
@@ -114,14 +111,17 @@ local function updateAimBot(deltaTime)
     if lastUpdate < _G.KillerAimBot.Settings.UpdateInterval then return end
     lastUpdate = 0
     
-    -- Поиск убийцы если он не найден или удален
     if not currentKiller or not currentKiller.Parent then
         currentKiller = findKiller()
-        if not currentKiller then return end
+        if not currentKiller then 
+            return 
+        end
     end
     
     local killerRoot = currentKiller:FindFirstChild("HumanoidRootPart")
-    if not killerRoot then return end
+    if not killerRoot then 
+        return 
+    end
     
     local nearestSurvivor, distance = findNearestSurvivor(killerRoot.Position)
     if nearestSurvivor then
@@ -141,8 +141,12 @@ function _G.KillerAimBot:Start()
     self.Settings.Enabled = true
     currentKiller = findKiller()
     
+    if not currentKiller then
+        self.Settings.Enabled = false
+        return
+    end
+    
     connection = RunService.Heartbeat:Connect(updateAimBot)
-    print("KillerAimBot: Started")
 end
 
 function _G.KillerAimBot:Stop()
@@ -153,7 +157,6 @@ function _G.KillerAimBot:Stop()
     
     self.Settings.Enabled = false
     currentKiller = nil
-    print("KillerAimBot: Stopped")
 end
 
 function _G.KillerAimBot:Toggle()
@@ -165,28 +168,23 @@ function _G.KillerAimBot:Toggle()
 end
 
 function _G.KillerAimBot:SetMaxDistance(distance)
-    self.Settings.MaxDistance = distance
-    print("KillerAimBot: MaxDistance set to", distance)
+    self.Settings.MaxDistance = tonumber(distance) or 50
 end
 
 function _G.KillerAimBot:SetUpdateInterval(interval)
-    self.Settings.UpdateInterval = interval
-    print("KillerAimBot: UpdateInterval set to", interval)
+    self.Settings.UpdateInterval = tonumber(interval) or 0.1
 end
 
 function _G.KillerAimBot:SetSmoothAim(enabled)
-    self.Settings.SmoothAim = enabled
-    print("KillerAimBot: SmoothAim", enabled and "enabled" or "disabled")
+    self.Settings.SmoothAim = enabled == true
 end
 
 function _G.KillerAimBot:SetSmoothness(value)
-    self.Settings.Smoothness = math.clamp(value, 0.1, 1.0)
-    print("KillerAimBot: Smoothness set to", self.Settings.Smoothness)
+    self.Settings.Smoothness = math.clamp(tonumber(value) or 0.5, 0.1, 1.0)
 end
 
 function _G.KillerAimBot:SetAimHeightOffset(offset)
-    self.Settings.AimHeightOffset = offset
-    print("KillerAimBot: AimHeightOffset set to", offset)
+    self.Settings.AimHeightOffset = tonumber(offset) or 0
 end
 
 function _G.KillerAimBot:GetStatus()
