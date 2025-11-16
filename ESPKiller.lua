@@ -1,7 +1,6 @@
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
--- Создаем глобальную функцию сразу
 _G.ESPKiller = function(enabled)
     if not _G.KillerESP then
         _G.KillerESP = {
@@ -17,9 +16,7 @@ _G.ESPKiller = function(enabled)
     ESP.LastCommand = enabled
     
     if enabled then
-        -- Включение ESP
         if ESP.Enabled then
-            -- Очищаем перед повторной инициализацией
             for name, connection in pairs(ESP.Connections) do
                 if connection then connection:Disconnect() end
             end
@@ -38,7 +35,6 @@ _G.ESPKiller = function(enabled)
             ESP.CurrentKiller = nil
         end
         
-        -- Ищем убийцу
         local killersFolder = workspace:FindFirstChild("Players") and workspace.Players:FindFirstChild("Killers")
         if not killersFolder then 
             return false 
@@ -58,7 +54,6 @@ _G.ESPKiller = function(enabled)
         
         ESP.CurrentKiller = killer
         
-        -- Создаем тег
         local rootPart = killer:FindFirstChild("HumanoidRootPart") or 
                          killer:FindFirstChild("Head") or 
                          killer:FindFirstChildWhichIsA("BasePart")
@@ -67,7 +62,6 @@ _G.ESPKiller = function(enabled)
             return false 
         end
         
-        -- BillboardGui
         local billboard = Instance.new("BillboardGui")
         billboard.Name = "KillerESP_" .. killer.Name
         billboard.Adornee = rootPart
@@ -76,16 +70,14 @@ _G.ESPKiller = function(enabled)
         billboard.AlwaysOnTop = true
         billboard.MaxDistance = 2000
         billboard.Parent = rootPart
-        
-        -- Фон - СДЕЛАЛИ ПРОЗРАЧНЫМ
+
         local background = Instance.new("Frame")
         background.Size = UDim2.new(1, 0, 1, 0)
         background.BackgroundColor3 = Color3.new(0, 0, 0)
         background.BackgroundTransparency = 1.0 -- ПОЛНОСТЬЮ ПРОЗРАЧНЫЙ
         background.BorderSizePixel = 0
         background.Parent = billboard
-        
-        -- Имя убийцы
+
         local nameLabel = Instance.new("TextLabel")
         nameLabel.Size = UDim2.new(1, 0, 0.6, 0)
         nameLabel.BackgroundTransparency = 1 -- Прозрачный фон
@@ -97,7 +89,6 @@ _G.ESPKiller = function(enabled)
         nameLabel.Font = Enum.Font.GothamBold
         nameLabel.Parent = billboard
         
-        -- Дистанция
         local distanceLabel = Instance.new("TextLabel")
         distanceLabel.Size = UDim2.new(1, 0, 0.4, 0)
         distanceLabel.Position = UDim2.new(0, 0, 0.6, 0)
@@ -117,7 +108,6 @@ _G.ESPKiller = function(enabled)
             rootPart = rootPart
         }
         
-        -- Подсветка частей
         local function highlightParts(obj)
             if obj:IsA("BasePart") then
                 local highlight = Instance.new("Highlight")
@@ -139,7 +129,6 @@ _G.ESPKiller = function(enabled)
         
         highlightParts(killer)
         
-        -- Обновление расстояния
         ESP.Connections.distanceUpdate = RunService.Heartbeat:Connect(function()
             if not ESP.Enabled or not ESP.NameTag or not ESP.NameTag.distanceLabel then return end
             
@@ -154,8 +143,7 @@ _G.ESPKiller = function(enabled)
             
             local distance = (localRoot.Position - killerRoot.Position).Magnitude
             ESP.NameTag.distanceLabel.Text = math.floor(distance) .. "m"
-            
-            -- Цвет дистанции
+
             if distance < 15 then
                 ESP.NameTag.distanceLabel.TextColor3 = Color3.new(1, 0, 0)
                 ESP.NameTag.nameLabel.TextColor3 = Color3.new(1, 0, 0)
@@ -168,11 +156,9 @@ _G.ESPKiller = function(enabled)
             end
         end)
         
-        -- Отслеживание удаления убийцы
         if ESP.CurrentKiller then
             ESP.Connections.killerRemoved = ESP.CurrentKiller.AncestryChanged:Connect(function(_, parent)
                 if parent == nil then
-                    -- Переинициализация через 1 секунду
                     if ESP.Connections.reinitialize then
                         ESP.Connections.reinitialize:Disconnect()
                     end
@@ -195,7 +181,6 @@ _G.ESPKiller = function(enabled)
         return true
         
     else
-        -- Выключение ESP
         ESP.Enabled = false
         
         for name, connection in pairs(ESP.Connections) do
@@ -222,7 +207,6 @@ _G.ESPKiller = function(enabled)
     end
 end
 
--- Авто-обновление
 spawn(function()
     while true do
         wait(3)
