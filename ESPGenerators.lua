@@ -1,7 +1,6 @@
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
--- Создаем глобальную функцию для генераторов
 _G.ESPGenerators = function(enabled)
     if not _G.GeneratorsESP then
         _G.GeneratorsESP = {
@@ -21,7 +20,6 @@ _G.ESPGenerators = function(enabled)
     if enabled then
         -- Включение ESP
         if ESP.Enabled then
-            -- Очищаем перед повторной инициализацией
             for name, connection in pairs(ESP.Connections) do
                 if connection then connection:Disconnect() end
             end
@@ -43,13 +41,11 @@ _G.ESPGenerators = function(enabled)
             ESP.FakeGenerators = {}
         end
         
-        -- Ищем генераторы
         local mapFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Ingame") and workspace.Map.Ingame:FindFirstChild("Map")
         if not mapFolder then 
             return false 
         end
         
-        -- Собираем настоящие генераторы (Generator1, Generator2, ..., Generator5)
         local generators = {}
         local fakeGenerators = {}
         
@@ -61,7 +57,6 @@ _G.ESPGenerators = function(enabled)
             end
         end
         
-        -- Также проверяем базовое имя "Generator" на случай нового генератора
         local baseGenerator = mapFolder:FindFirstChild("Generator")
         if baseGenerator then
             -- Переименовываем новый генератор
@@ -77,7 +72,6 @@ _G.ESPGenerators = function(enabled)
             end
         end
         
-        -- Ищем фейковые генераторы
         local fakeGenerator = mapFolder:FindFirstChild("FakeGenerator")
         if fakeGenerator then
             table.insert(fakeGenerators, fakeGenerator)
@@ -90,19 +84,16 @@ _G.ESPGenerators = function(enabled)
         ESP.Generators = generators
         ESP.FakeGenerators = fakeGenerators
         
-        -- Функция для создания ESP объекта
         local function createGeneratorESP(generator, isFake)
             local rootPart = generator:FindFirstChildWhichIsA("BasePart")
             if not rootPart then 
                 return nil
             end
             
-            -- Ищем Progress StringValue
             local progressValue = generator:FindFirstChild("Progress")
             if not progressValue or not progressValue:IsA("StringValue") then
             end
             
-            -- BillboardGui
             local billboard = Instance.new("BillboardGui")
             billboard.Name = "GeneratorESP_" .. generator.Name
             billboard.Adornee = rootPart
@@ -112,7 +103,6 @@ _G.ESPGenerators = function(enabled)
             billboard.MaxDistance = 2000
             billboard.Parent = rootPart
             
-            -- Фон - ПРОЗРАЧНЫЙ
             local background = Instance.new("Frame")
             background.Size = UDim2.new(1, 0, 1, 0)
             background.BackgroundColor3 = Color3.new(0, 0, 0)
@@ -120,7 +110,6 @@ _G.ESPGenerators = function(enabled)
             background.BorderSizePixel = 0
             background.Parent = billboard
             
-            -- Название генератора
             local nameLabel = Instance.new("TextLabel")
             nameLabel.Size = UDim2.new(1, 0, 0.4, 0)
             nameLabel.BackgroundTransparency = 1
@@ -132,7 +121,6 @@ _G.ESPGenerators = function(enabled)
             nameLabel.Font = Enum.Font.GothamBold
             nameLabel.Parent = billboard
             
-            -- Прогресс
             local progressLabel = Instance.new("TextLabel")
             progressLabel.Size = UDim2.new(1, 0, 0.3, 0)
             progressLabel.Position = UDim2.new(0, 0, 0.4, 0)
@@ -145,7 +133,6 @@ _G.ESPGenerators = function(enabled)
             progressLabel.Font = Enum.Font.Gotham
             progressLabel.Parent = billboard
             
-            -- Дистанция
             local distanceLabel = Instance.new("TextLabel")
             distanceLabel.Size = UDim2.new(1, 0, 0.3, 0)
             distanceLabel.Position = UDim2.new(0, 0, 0.7, 0)
@@ -169,7 +156,6 @@ _G.ESPGenerators = function(enabled)
                 currentProgress = progressValue and tonumber(progressValue.Value) or 0
             }
             
-            -- Подсветка генератора
             local highlight = Instance.new("Highlight")
             highlight.Name = "GeneratorHighlight"
             highlight.Adornee = generator
@@ -177,17 +163,15 @@ _G.ESPGenerators = function(enabled)
             highlight.OutlineTransparency = 0
             highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
             
-            -- Устанавливаем цвет в зависимости от типа и прогресса
             if isFake then
                 -- Фейк генератор - всегда красный
                 highlight.FillColor = Color3.new(1, 0, 0)
                 highlight.OutlineColor = Color3.new(1, 0.2, 0.2)
             else
-                -- Настоящий генератор - желтый, при 100% - зеленый
                 if espData.currentProgress >= 100 then
                     highlight.FillColor = Color3.new(0, 1, 0)
                     highlight.OutlineColor = Color3.new(0.2, 1, 0.2)
-                    nameLabel.TextColor3 = Color3.new(0, 1, 0) -- Зеленый текст для завершенных
+                    nameLabel.TextColor3 = Color3.new(0, 1, 0)
                 else
                     highlight.FillColor = Color3.new(1, 1, 0)
                     highlight.OutlineColor = Color3.new(1, 1, 0.2)
@@ -200,7 +184,6 @@ _G.ESPGenerators = function(enabled)
             return espData
         end
         
-        -- Создаем ESP для настоящих генераторов
         for _, generator in pairs(generators) do
             local espData = createGeneratorESP(generator, false)
             if espData then
@@ -208,7 +191,6 @@ _G.ESPGenerators = function(enabled)
             end
         end
         
-        -- Создаем ESP для фейковых генераторов
         for _, fakeGenerator in pairs(fakeGenerators) do
             local espData = createGeneratorESP(fakeGenerator, true)
             if espData then
@@ -216,7 +198,6 @@ _G.ESPGenerators = function(enabled)
             end
         end
         
-        -- Обновление расстояния и прогресса
         ESP.Connections.update = RunService.Heartbeat:Connect(function()
             if not ESP.Enabled or not ESP.NameTags then return end
             
@@ -230,12 +211,10 @@ _G.ESPGenerators = function(enabled)
                 if not espData or not espData.distanceLabel or not espData.rootPart then
                     continue
                 end
-                
-                -- Обновление расстояния
+            
                 local distance = (localRoot.Position - espData.rootPart.Position).Magnitude
                 espData.distanceLabel.Text = math.floor(distance) .. "m"
                 
-                -- Цвет дистанции
                 if distance < 10 then
                     espData.distanceLabel.TextColor3 = Color3.new(0, 1, 0)
                 elseif distance < 25 then
@@ -244,25 +223,22 @@ _G.ESPGenerators = function(enabled)
                     espData.distanceLabel.TextColor3 = Color3.new(1, 1, 1)
                 end
                 
-                -- Обновление прогресса
                 if espData.progressValue then
                     local currentProgress = tonumber(espData.progressValue.Value) or 0
                     espData.progressLabel.Text = "Progress: " .. espData.progressValue.Value .. "%"
                     
-                    -- Обновляем цвет если прогресс изменился
                     if not espData.isFake and currentProgress ~= espData.currentProgress then
                         espData.currentProgress = currentProgress
                         
-                        -- Находим highlight для этого генератора
                         local highlight = generator:FindFirstChild("GeneratorHighlight")
                         if highlight then
                             if currentProgress >= 100 then
-                                -- Зеленый для завершенных генераторов
+
                                 highlight.FillColor = Color3.new(0, 1, 0)
                                 highlight.OutlineColor = Color3.new(0.2, 1, 0.2)
                                 espData.nameLabel.TextColor3 = Color3.new(0, 1, 0)
                             else
-                                -- Желтый для незавершенных
+
                                 highlight.FillColor = Color3.new(1, 1, 0)
                                 highlight.OutlineColor = Color3.new(1, 1, 0.2)
                                 espData.nameLabel.TextColor3 = Color3.new(1, 1, 0)
@@ -273,9 +249,9 @@ _G.ESPGenerators = function(enabled)
             end
         end)
         
-        -- Отслеживание изменений в папке генераторов
+
         ESP.Connections.childAdded = mapFolder.ChildAdded:Connect(function(child)
-            wait(0.5) -- Ждем немного для инициализации
+            wait(0.5)
             
             if ESP.LastCommand then
                 if child.Name == "Generator" or child.Name:match("Generator%d") then
@@ -292,11 +268,9 @@ _G.ESPGenerators = function(enabled)
                         end
                     end
                     
-                    -- Перезапускаем ESP для включения нового генератора
                     wait(1)
                     _G.ESPGenerators(true)
                 elseif child.Name == "FakeGenerator" then
-                    -- Перезапускаем ESP для включения нового фейк-генератора
                     wait(1)
                     _G.ESPGenerators(true)
                 end
@@ -306,13 +280,11 @@ _G.ESPGenerators = function(enabled)
         ESP.Connections.childRemoved = mapFolder.ChildRemoved:Connect(function(child)
             if ESP.LastCommand then
                 if ESP.NameTags[child] then
-                    -- Удаляем ESP данные для удаленного генератора
                     if ESP.NameTags[child].billboard then
                         ESP.NameTags[child].billboard:Destroy()
                     end
                     ESP.NameTags[child] = nil
                     
-                    -- Перезапускаем ESP для обновления списка
                     wait(1)
                     _G.ESPGenerators(true)
                 end
@@ -323,7 +295,6 @@ _G.ESPGenerators = function(enabled)
         return true
         
     else
-        -- Выключение ESP
         ESP.Enabled = false
         
         for name, connection in pairs(ESP.Connections) do
@@ -355,25 +326,22 @@ _G.ESPGenerators = function(enabled)
     end
 end
 
--- Авто-обновление
 spawn(function()
     while true do
-        wait(5) -- Проверяем реже, т.к. генераторы не часто меняются
+        wait(5)
         if _G.GeneratorsESP then
             local ESP = _G.GeneratorsESP
             
-            -- Автоматическое переподключение если ESP был включен но отключился
             if ESP.LastCommand and not ESP.Enabled then
                 _G.ESPGenerators(true)
             end
             
-            -- Проверяем актуальность генераторов
+
             if ESP.Enabled and ESP.NameTags then
                 local needsRefresh = false
                 local mapFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Ingame") and workspace.Map.Ingame:FindFirstChild("Map")
                 
                 if mapFolder then
-                    -- Проверяем существование генераторов
                     for generator in pairs(ESP.NameTags) do
                         if not generator.Parent then
                             needsRefresh = true
@@ -381,7 +349,6 @@ spawn(function()
                         end
                     end
                     
-                    -- Проверяем появление новых генераторов (Generator1-5 и FakeGenerator)
                     for i = 1, 5 do
                         local generatorName = "Generator" .. i
                         local generator = mapFolder:FindFirstChild(generatorName)
@@ -391,13 +358,11 @@ spawn(function()
                         end
                     end
                     
-                    -- Проверяем FakeGenerator
                     local fakeGenerator = mapFolder:FindFirstChild("FakeGenerator")
                     if fakeGenerator and not ESP.NameTags[fakeGenerator] then
                         needsRefresh = true
                     end
                     
-                    -- Проверяем базовый Generator (непереименованный)
                     local baseGenerator = mapFolder:FindFirstChild("Generator")
                     if baseGenerator then
                         needsRefresh = true
