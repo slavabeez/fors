@@ -1,4 +1,3 @@
--- Скрипт для loadstring
 if _G.KillerAimBot then
     _G.KillerAimBot:Stop()
     _G.KillerAimBot = nil
@@ -15,14 +14,12 @@ _G.KillerAimBot = {
     }
 }
 
--- Локальные переменные
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local connection = nil
 local lastUpdate = 0
 local currentKiller = nil
 
--- Локальные функции
 local function findKiller()
     local killersFolder = workspace:FindFirstChild("Players")
     if killersFolder then
@@ -132,7 +129,6 @@ local function updateAimBot(deltaTime)
     end
 end
 
--- Глобальные функции для управления
 function _G.KillerAimBot:Start()
     if connection then
         connection:Disconnect()
