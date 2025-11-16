@@ -43,7 +43,6 @@ _G.ESPPlayers = function(enabled)
         -- Ищем выживших
         local survivorsFolder = workspace:FindFirstChild("Players") and workspace.Players:FindFirstChild("Survivors")
         if not survivorsFolder then 
-            warn("Survivors folder not found!")
             return false 
         end
         
@@ -55,7 +54,6 @@ _G.ESPPlayers = function(enabled)
         end
         
         if #survivors == 0 then
-            warn("No survivors found!")
             return false
         end
         
@@ -69,7 +67,6 @@ _G.ESPPlayers = function(enabled)
                              survivor:FindFirstChildWhichIsA("BasePart")
             
             if not rootPart then 
-                warn("No root part found for survivor: " .. survivor.Name)
                 continue 
             end
             
