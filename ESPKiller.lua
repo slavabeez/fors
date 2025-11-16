@@ -41,7 +41,6 @@ _G.ESPKiller = function(enabled)
         -- Ищем убийцу
         local killersFolder = workspace:FindFirstChild("Players") and workspace.Players:FindFirstChild("Killers")
         if not killersFolder then 
-            warn("Killers folder not found!")
             return false 
         end
         
@@ -54,7 +53,6 @@ _G.ESPKiller = function(enabled)
         end
         
         if not killer then
-            warn("No killer found!")
             return false
         end
         
@@ -66,7 +64,6 @@ _G.ESPKiller = function(enabled)
                          killer:FindFirstChildWhichIsA("BasePart")
         
         if not rootPart then 
-            warn("No root part found!")
             return false 
         end
         
