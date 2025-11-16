@@ -47,29 +47,31 @@ _G.ESPItems = function(enabled)
             return false 
         end
         
-        -- Собираем предметы
+        -- Собираем все предметы с одинаковыми названиями
         local items = {}
         
-        -- Ищем Medkit
-        local medkit = mapFolder:FindFirstChild("Medkit")
-        if medkit then
-            table.insert(items, {
-                Object = medkit,
-                Type = "Medkit",
-                Color = Color3.new(0.5, 0, 0.5), -- Фиолетовый для Medkit
-                DisplayName = "Medkit"
-            })
+        -- Ищем все Medkit
+        for _, medkit in pairs(mapFolder:GetChildren()) do
+            if medkit.Name == "Medkit" then
+                table.insert(items, {
+                    Object = medkit,
+                    Type = "Medkit",
+                    Color = Color3.new(0.5, 0, 0.5), -- Фиолетовый для Medkit
+                    DisplayName = "Medkit"
+                })
+            end
         end
         
-        -- Ищем BloxyCola
-        local bloxyCola = mapFolder:FindFirstChild("BloxyCola")
-        if bloxyCola then
-            table.insert(items, {
-                Object = bloxyCola,
-                Type = "BloxyCola", 
-                Color = Color3.new(0.5, 0, 0.5), -- Фиолетовый для BloxyCola
-                DisplayName = "Bloxy Cola"
-            })
+        -- Ищем все BloxyCola
+        for _, bloxyCola in pairs(mapFolder:GetChildren()) do
+            if bloxyCola.Name == "BloxyCola" then
+                table.insert(items, {
+                    Object = bloxyCola,
+                    Type = "BloxyCola", 
+                    Color = Color3.new(0.5, 0, 0.5), -- Фиолетовый для BloxyCola
+                    DisplayName = "Bloxy Cola"
+                })
+            end
         end
         
         if #items == 0 then
@@ -86,9 +88,12 @@ _G.ESPItems = function(enabled)
                 return nil
             end
             
+            -- Создаем уникальный идентификатор для объекта
+            local objectId = tostring(item):gsub(" ", "_")
+            
             -- BillboardGui
             local billboard = Instance.new("BillboardGui")
-            billboard.Name = "ItemESP_" .. item.Name
+            billboard.Name = "ItemESP_" .. objectId
             billboard.Adornee = rootPart
             billboard.Size = UDim2.new(0, 250, 0, 40)
             billboard.StudsOffset = Vector3.new(0, 2.5, 0)
@@ -134,12 +139,13 @@ _G.ESPItems = function(enabled)
                 nameLabel = nameLabel,
                 distanceLabel = distanceLabel,
                 rootPart = rootPart,
-                itemData = itemData
+                itemData = itemData,
+                objectId = objectId
             }
             
             -- Подсветка предмета (фиолетовый)
             local highlight = Instance.new("Highlight")
-            highlight.Name = "ItemHighlight"
+            highlight.Name = "ItemHighlight_" .. objectId
             highlight.Adornee = item
             highlight.FillColor = Color3.new(0.5, 0, 0.5) -- Фиолетовый
             highlight.FillTransparency = 0.5
@@ -173,6 +179,11 @@ _G.ESPItems = function(enabled)
             
             for item, espData in pairs(ESP.NameTags) do
                 if not espData or not espData.distanceLabel or not espData.rootPart then
+                    continue
+                end
+                
+                -- Проверяем что объект все еще существует
+                if not item.Parent then
                     continue
                 end
                 
@@ -216,6 +227,25 @@ _G.ESPItems = function(enabled)
                 end
             end
         end)
+        
+        -- Отслеживание удаления через AncestryChanged
+        for item, espData in pairs(ESP.NameTags) do
+            ESP.Connections["ancestry_" .. espData.objectId] = item.AncestryChanged:Connect(function(_, parent)
+                if parent == nil then
+                    if ESP.NameTags[item] then
+                        if ESP.NameTags[item].billboard then
+                            ESP.NameTags[item].billboard:Destroy()
+                        end
+                        ESP.NameTags[item] = nil
+                        
+                        if ESP.LastCommand then
+                            wait(1)
+                            _G.ESPItems(true)
+                        end
+                    end
+                end
+            end)
+        end
         
         ESP.Enabled = true
         return true
@@ -263,11 +293,12 @@ spawn(function()
                 _G.ESPItems(true)
             end
             
-            if ESP.Enabled and ESP.NameTags then
+            if ESP.Enabled then
                 local needsRefresh = false
                 local mapFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Ingame") and workspace.Map.Ingame:FindFirstChild("Map")
                 
                 if mapFolder then
+                    -- Проверяем существование всех отслеживаемых объектов
                     for item in pairs(ESP.NameTags) do
                         if not item.Parent then
                             needsRefresh = true
@@ -275,15 +306,32 @@ spawn(function()
                         end
                     end
                     
-                    local medkit = mapFolder:FindFirstChild("Medkit")
-                    local bloxyCola = mapFolder:FindFirstChild("BloxyCola")
+                    -- Проверяем появление новых объектов
+                    local currentMedkits = {}
+                    local currentBloxyColas = {}
                     
-                    if medkit and not ESP.NameTags[medkit] then
-                        needsRefresh = true
+                    for _, child in pairs(mapFolder:GetChildren()) do
+                        if child.Name == "Medkit" then
+                            table.insert(currentMedkits, child)
+                        elseif child.Name == "BloxyCola" then
+                            table.insert(currentBloxyColas, child)
+                        end
                     end
                     
-                    if bloxyCola and not ESP.NameTags[bloxyCola] then
-                        needsRefresh = true
+                    -- Проверяем Medkit
+                    for _, medkit in pairs(currentMedkits) do
+                        if not ESP.NameTags[medkit] then
+                            needsRefresh = true
+                            break
+                        end
+                    end
+                    
+                    -- Проверяем BloxyCola
+                    for _, bloxyCola in pairs(currentBloxyColas) do
+                        if not ESP.NameTags[bloxyCola] then
+                            needsRefresh = true
+                            break
+                        end
                     end
                 end
                 
