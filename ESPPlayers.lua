@@ -1,7 +1,6 @@
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
--- Создаем глобальную функцию для выживших
 _G.ESPPlayers = function(enabled)
     if not _G.PlayersESP then
         _G.PlayersESP = {
@@ -70,7 +69,6 @@ _G.ESPPlayers = function(enabled)
                 continue 
             end
             
-            -- BillboardGui
             local billboard = Instance.new("BillboardGui")
             billboard.Name = "SurvivorESP_" .. survivor.Name
             billboard.Adornee = rootPart
@@ -80,7 +78,6 @@ _G.ESPPlayers = function(enabled)
             billboard.MaxDistance = 2000
             billboard.Parent = rootPart
             
-            -- Фон - ПРОЗРАЧНЫЙ
             local background = Instance.new("Frame")
             background.Size = UDim2.new(1, 0, 1, 0)
             background.BackgroundColor3 = Color3.new(0, 0, 0)
@@ -88,7 +85,6 @@ _G.ESPPlayers = function(enabled)
             background.BorderSizePixel = 0
             background.Parent = billboard
             
-            -- Имя выжившего
             local nameLabel = Instance.new("TextLabel")
             nameLabel.Size = UDim2.new(1, 0, 0.6, 0)
             nameLabel.BackgroundTransparency = 1 -- Прозрачный фон
@@ -100,7 +96,6 @@ _G.ESPPlayers = function(enabled)
             nameLabel.Font = Enum.Font.GothamBold
             nameLabel.Parent = billboard
             
-            -- Дистанция
             local distanceLabel = Instance.new("TextLabel")
             distanceLabel.Size = UDim2.new(1, 0, 0.4, 0)
             distanceLabel.Position = UDim2.new(0, 0, 0.6, 0)
@@ -120,7 +115,6 @@ _G.ESPPlayers = function(enabled)
                 rootPart = rootPart
             }
             
-            -- Подсветка частей выжившего ЗЕЛЕНЫМ цветом
             local function highlightParts(obj)
                 if obj:IsA("BasePart") then
                     local highlight = Instance.new("Highlight")
@@ -142,7 +136,6 @@ _G.ESPPlayers = function(enabled)
             
             highlightParts(survivor)
             
-            -- Отслеживание удаления выжившего
             ESP.Connections["survivorRemoved_" .. survivor.Name] = survivor.AncestryChanged:Connect(function(_, parent)
                 if parent == nil then
                     -- Удаляем тег и подсветку для этого выжившего
@@ -151,7 +144,6 @@ _G.ESPPlayers = function(enabled)
                         ESP.NameTags[survivor] = nil
                     end
                     
-                    -- Обновляем список выживших
                     for i, surv in pairs(ESP.CurrentSurvivors) do
                         if surv == survivor then
                             table.remove(ESP.CurrentSurvivors, i)
@@ -162,7 +154,6 @@ _G.ESPPlayers = function(enabled)
             end)
         end
         
-        -- Обновление расстояния для всех выживших
         ESP.Connections.distanceUpdate = RunService.Heartbeat:Connect(function()
             if not ESP.Enabled or not ESP.NameTags then return end
             
@@ -180,7 +171,6 @@ _G.ESPPlayers = function(enabled)
                 local distance = (localRoot.Position - nameTag.rootPart.Position).Magnitude
                 nameTag.distanceLabel.Text = math.floor(distance) .. "m"
                 
-                -- Цвет дистанции
                 if distance < 15 then
                     nameTag.distanceLabel.TextColor3 = Color3.new(1, 0, 0)
                 elseif distance < 30 then
@@ -191,7 +181,6 @@ _G.ESPPlayers = function(enabled)
             end
         end)
         
-        -- Отслеживание появления новых выживших
         local survivorsFolder = workspace.Players.Survivors
         ESP.Connections.newSurvivorAdded = survivorsFolder.ChildAdded:Connect(function(child)
             wait(1) -- Ждем немного для инициализации модели
@@ -205,7 +194,7 @@ _G.ESPPlayers = function(enabled)
         return true
         
     else
-        -- Выключение ESP
+
         ESP.Enabled = false
         
         for name, connection in pairs(ESP.Connections) do
@@ -236,7 +225,6 @@ _G.ESPPlayers = function(enabled)
     end
 end
 
--- Авто-обновление
 spawn(function()
     while true do
         wait(3)
@@ -248,11 +236,9 @@ spawn(function()
                 _G.ESPPlayers(true)
             end
             
-            -- Проверяем актуальность выживших
             if ESP.Enabled and ESP.NameTags then
                 local needsRefresh = false
                 
-                -- Проверяем существование выживших
                 for survivor, nameTag in pairs(ESP.NameTags) do
                     if not survivor.Parent or not nameTag.rootPart or not nameTag.rootPart.Parent then
                         needsRefresh = true
@@ -260,7 +246,6 @@ spawn(function()
                     end
                 end
                 
-                -- Проверяем появление новых выживших
                 local survivorsFolder = workspace:FindFirstChild("Players") and workspace.Players:FindFirstChild("Survivors")
                 if survivorsFolder then
                     local currentCount = 0
